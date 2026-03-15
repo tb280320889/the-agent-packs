@@ -1,0 +1,21 @@
+name: release-store-review
+kind: workflow-package
+domain: release
+subdomain: store-review
+layer: capability-line
+version: 0.1.0
+goal: >
+  Prepare browser extension submissions by checking manifest,
+  permissions, and store-facing policy alignment after main workflow routing.
+inputs:
+  - manifest_review
+  - store_targets
+  - bounded_context
+depends_on: []
+validators:
+  - validator-core-output
+artifacts:
+  - store-review.md
+exit_criteria:
+  - checklist_ready
+  - store_risks_summarized

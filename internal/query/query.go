@@ -13,13 +13,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	"the-agent-packs/internal/model"
+	"the-agent-packs/internal/registry"
 )
-
-var packNodeMap = map[string]string{
-	"wxt-manifest":         "L1.wxt.manifest",
-	"security-permissions": "L1.security.permissions",
-	"release-store-review": "L1.release.store-review",
-}
 
 type packProfile struct {
 	PackName              string
@@ -39,38 +34,28 @@ type nodeRecord struct {
 	Summary         string
 }
 
-var nodeProfileMap = map[string]packProfile{
-	"L1.wxt.manifest": {
-		PackName:              "wxt-manifest",
-		RecommendedValidators: []string{"validator-core-output", "validator-domain-wxt-manifest"},
-		RecommendedArtifacts:  []string{"manifest-review.md"},
-	},
-	"L1.security.permissions": {
-		PackName:              "security-permissions",
-		RecommendedValidators: []string{},
-		RecommendedArtifacts:  []string{},
-	},
-	"L1.release.store-review": {
-		PackName:              "release-store-review",
-		RecommendedValidators: []string{},
-		RecommendedArtifacts:  []string{},
-	},
-}
-
 func PackForNode(nodeID string) string {
-	profile, ok := nodeProfileMap[nodeID]
+	profile, ok := profileForNode(nodeID)
 	if !ok {
 		return ""
 	}
 	return profile.PackName
 }
 
-func profileForNode(nodeID string) packProfile {
-	profile, ok := nodeProfileMap[nodeID]
-	if !ok {
-		return packProfile{}
+func profileForNode(nodeID string) (packProfile, bool) {
+	reg, err := registry.Default()
+	if err != nil {
+		return packProfile{}, false
 	}
-	return profile
+	entry, ok := registry.FindByNode(reg, nodeID)
+	if !ok {
+		return packProfile{}, false
+	}
+	return packProfile{
+		PackName:              entry.Name,
+		RecommendedValidators: append([]string{}, entry.RecommendedValidators...),
+		RecommendedArtifacts:  append([]string{}, entry.RecommendedArtifacts...),
+	}, true
 }
 
 func OpenDB(dbPath string) (*sql.DB, error) {
@@ -291,28 +276,32 @@ func buildCandidate(candidate nodeRecord, score float64, reason []string) model.
 
 func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targetDomain *string, selectedFiles, configFragments, contextHints []string, maxResults int) (model.RouteResult, error) {
 	if targetPack != nil {
-		if mappedNode, ok := packNodeMap[*targetPack]; ok {
-			directRec, recErr := fetchNodeRecord(db, mappedNode)
-			direct, err := ReadNode(db, mappedNode, "summary")
-			if err == nil && recErr == nil && direct != nil && direct.Level == level {
-				must, _ := fetchEdges(db, direct.ID, "required_with")
-				reason := []string{"target_pack match"}
-				if targetDomain != nil {
-					reason = append(reason, fmt.Sprintf("target_domain=%s bypassed by explicit target_pack", *targetDomain))
+		reg, regErr := registry.Default()
+		if regErr == nil {
+			if entry, ok := registry.FindByName(reg, *targetPack); ok {
+				mappedNode := entry.CanonicalBlueprintNode
+				directRec, recErr := fetchNodeRecord(db, mappedNode)
+				direct, err := ReadNode(db, mappedNode, "summary")
+				if err == nil && recErr == nil && direct != nil && direct.Level == level {
+					must, _ := fetchEdges(db, direct.ID, "required_with")
+					reason := []string{"target_pack match"}
+					if targetDomain != nil {
+						reason = append(reason, fmt.Sprintf("target_domain=%s bypassed by explicit target_pack", *targetDomain))
+					}
+					return model.RouteResult{
+						Candidates: []model.RouteCandidate{{
+							ID:              direct.ID,
+							Title:           direct.Title,
+							Summary:         direct.Summary,
+							Score:           99.0,
+							Reason:          reason,
+							NodeKind:        directRec.NodeKind,
+							VisibilityScope: directRec.VisibilityScope,
+							ActivationMode:  directRec.ActivationMode,
+						}},
+						MustInclude: must,
+					}, nil
 				}
-				return model.RouteResult{
-					Candidates: []model.RouteCandidate{{
-						ID:              direct.ID,
-						Title:           direct.Title,
-						Summary:         direct.Summary,
-						Score:           99.0,
-						Reason:          reason,
-						NodeKind:        directRec.NodeKind,
-						VisibilityScope: directRec.VisibilityScope,
-						ActivationMode:  directRec.ActivationMode,
-					}},
-					MustInclude: must,
-				}, nil
 			}
 		}
 	}
@@ -445,9 +434,10 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		return bundle, nil
 	}
 	bundle.Main = main
-	profile := profileForNode(mainNode)
-	bundle.RecommendedValidators = append(bundle.RecommendedValidators, profile.RecommendedValidators...)
-	bundle.RecommendedArtifacts = append(bundle.RecommendedArtifacts, profile.RecommendedArtifacts...)
+	if profile, ok := profileForNode(mainNode); ok {
+		bundle.RecommendedValidators = append(bundle.RecommendedValidators, profile.RecommendedValidators...)
+		bundle.RecommendedArtifacts = append(bundle.RecommendedArtifacts, profile.RecommendedArtifacts...)
+	}
 
 	appendNode := func(targetID string, collection *[]model.NodeSummary) error {
 		node, err := ReadNode(db, targetID, "summary")

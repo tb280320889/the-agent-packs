@@ -1,0 +1,74 @@
+{
+  "reserved_names": [
+    "release",
+    "security",
+    "auth",
+    "payment",
+    "manifest",
+    "review"
+  ],
+  "packages": [
+    {
+      "name": "wxt-manifest",
+      "kind": "workflow-package",
+      "domain": "wxt",
+      "subdomain": "manifest",
+      "category": "workflow",
+      "canonical_blueprint_node": "L1.wxt.manifest",
+      "visibility_scope": "domain-scoped",
+      "activation_mode": "direct",
+      "aliases": [
+        "manifest review",
+        "wxt config"
+      ],
+      "reserved": false,
+      "recommended_validators": [
+        "validator-core-output",
+        "validator-domain-wxt-manifest"
+      ],
+      "recommended_artifacts": [
+        "manifest-review.md"
+      ],
+      "required_packs": [
+        "security-permissions",
+        "release-store-review"
+      ]
+    },
+    {
+      "name": "security-permissions",
+      "kind": "workflow-package",
+      "domain": "security",
+      "subdomain": "permissions",
+      "category": "capability",
+      "canonical_blueprint_node": "L1.security.permissions",
+      "visibility_scope": "capability-scoped",
+      "activation_mode": "attach-only",
+      "aliases": [
+        "security permissions",
+        "permissions review"
+      ],
+      "reserved": false,
+      "recommended_validators": [],
+      "recommended_artifacts": [],
+      "required_packs": []
+    },
+    {
+      "name": "release-store-review",
+      "kind": "workflow-package",
+      "domain": "release",
+      "subdomain": "store-review",
+      "category": "capability",
+      "canonical_blueprint_node": "L1.release.store-review",
+      "visibility_scope": "capability-scoped",
+      "activation_mode": "attach-only",
+      "aliases": [
+        "store review",
+        "submission review"
+      ],
+      "reserved": false,
+      "recommended_validators": [],
+      "recommended_artifacts": [],
+      "required_packs": []
+    }
+  ]
+}
