@@ -49,17 +49,19 @@ func ptr(s string) *string {
 	return &v
 }
 
-func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.Artifact) model.ValidationPlan {
-	bundleValidators := []string{"validator-core-output"}
-	if mainPack == "wxt-manifest" {
-		bundleValidators = append(bundleValidators, "validator-domain-wxt-manifest")
+func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.Artifact, bundleValidators []string) model.ValidationPlan {
+	if len(bundleValidators) == 0 {
+		bundleValidators = []string{"validator-core-output"}
 	}
 	validators := make([]model.ValidatorPlan, 0, len(bundleValidators))
 	for _, name := range bundleValidators {
 		scope := "artifact"
 		reason := "All output artifacts must satisfy envelope completeness."
-		if name == "validator-domain-wxt-manifest" {
+		if name != "validator-core-output" {
 			scope = "domain"
+			reason = "Domain validator must verify workflow-specific runtime constraints."
+		}
+		if name == "validator-domain-wxt-manifest" {
 			reason = "Manifest review must cover permission and store-facing risks."
 		}
 		validators = append(validators, model.ValidatorPlan{Name: name, Scope: scope, Reason: reason})
@@ -82,23 +84,28 @@ func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.A
 	}
 }
 
-func buildHandoff(mainPack string, task string) map[string]any {
-	if mainPack != "wxt-manifest" {
+func buildHandoff(mainPack string, task string, requiredPacks []string, artifacts []model.Artifact) map[string]any {
+	if len(requiredPacks) == 0 {
 		return nil
 	}
 	if !strings.Contains(strings.ToLower(task), "handoff") {
 		return nil
 	}
+	requiredArtifact := ""
+	if len(artifacts) > 0 {
+		requiredArtifact = artifacts[0].Name
+	}
+	requiredChecks := make([]string, 0, len(requiredPacks))
+	for _, pack := range requiredPacks {
+		requiredChecks = append(requiredChecks, pack+"-ready")
+	}
 	return map[string]any{
-		"from_pack": "wxt-manifest",
-		"to_packs":  []string{"security-permissions", "release-store-review"},
-		"reason":    "Manifest review reached package boundary and requires cross-line continuation.",
+		"from_pack": mainPack,
+		"to_packs":  append([]string{}, requiredPacks...),
+		"reason":    "Workflow review reached package boundary and requires registered continuation.",
 		"carry_context": map[string]any{
-			"required_artifact": "manifest-review.md",
-			"required_checks": []string{
-				"permissions-minimization",
-				"store-review-checklist",
-			},
+			"required_artifact": requiredArtifact,
+			"required_checks":   requiredChecks,
 		},
 	}
 }
@@ -254,10 +261,10 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		artifacts = append(artifacts, model.Artifact{Name: "manifest-review.md", Kind: "review-report"})
 	}
 
-	handoff := buildHandoff(mainPack, req.Task)
+	handoff := buildHandoff(mainPack, req.Task, bundle.RequiredPacks, artifacts)
 	contextInsufficient := len(req.BoundedContext.SelectedFiles) == 0 && len(req.BoundedContext.ConfigFragments) == 0
 
-	plan := buildValidationPlan(req, mainPack, artifacts)
+	plan := buildValidationPlan(req, mainPack, artifacts, append([]string{}, bundle.RecommendedValidators...))
 	vInput := validator.ExecutionInput{
 		Task:          req.Task,
 		MainPack:      mainPack,

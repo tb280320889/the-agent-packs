@@ -91,3 +91,45 @@ func TestM2ActivationHandoffCarriesCarryContext(t *testing.T) {
 		t.Fatalf("handoff payload missing carry_context")
 	}
 }
+
+func TestM2ActivationTargetPackUsesRegistryValidators(t *testing.T) {
+	dbPath := compileMainIndex(t)
+	db := openDB(t, dbPath)
+	defer db.Close()
+
+	request := map[string]any{
+		"request_id":  "req-security-direct-m2",
+		"task":        "permission review for extension submission",
+		"target_pack": "security-permissions",
+		"bounded_context": map[string]any{
+			"selected_files":   []string{"manifest.json"},
+			"config_fragments": []string{"manifest.permissions"},
+			"host_hints":       []string{"browser-extension"},
+		},
+	}
+	tempFile, err := os.CreateTemp("", "activation-m2-security-*.json")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+	enc := json.NewEncoder(tempFile)
+	if err := enc.Encode(request); err != nil {
+		t.Fatalf("write request failed: %v", err)
+	}
+
+	result, err := activation.Execute(db, tempFile.Name())
+	if err != nil {
+		t.Fatalf("activation execute failed: %v", err)
+	}
+	if result.MainPack == nil || *result.MainPack != "security-permissions" {
+		t.Fatalf("expected security-permissions main pack, got %+v", result.MainPack)
+	}
+	if len(result.Artifacts) != 1 || result.Artifacts[0].Name != "permissions-review.md" {
+		t.Fatalf("expected registry artifact for capability pack, got %+v", result.Artifacts)
+	}
+	plan := result.ValidationResults[0].ValidationPlan
+	if len(plan.Validators) != 1 || plan.Validators[0].Name != "validator-core-output" {
+		t.Fatalf("expected registry validators for capability pack, got %+v", plan.Validators)
+	}
+}

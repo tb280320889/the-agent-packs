@@ -193,3 +193,56 @@ func TestM3HandoffContainsCarryContext(t *testing.T) {
 		t.Fatalf("expected registry-aligned validators, got %+v", plan.Validators)
 	}
 }
+
+func TestM6CapabilityPackActivationProducesRegisteredHandoff(t *testing.T) {
+	dbPath := compileMainIndex(t)
+	db := openDB(t, dbPath)
+	defer db.Close()
+
+	requestPath := writeRequestFile(t, map[string]any{
+		"request_id":    "req-m6-capability-handoff-1",
+		"task":          "handoff after security permissions review",
+		"target_pack":   "wxt-manifest",
+		"target_domain": "wxt",
+		"bounded_context": map[string]any{
+			"selected_files":   []string{"wxt.config.ts"},
+			"config_fragments": []string{"manifest.permissions", "manifest.host_permissions"},
+			"host_hints":       []string{"browser-extension"},
+			"browser_hints":    []string{"chrome"},
+		},
+		"context_hints": []string{"store submission"},
+	})
+	defer os.Remove(requestPath)
+
+	result, err := activation.Execute(db, requestPath)
+	if err != nil {
+		t.Fatalf("activation execute failed: %v", err)
+	}
+	if result.Status != "handoff" {
+		t.Fatalf("expected handoff, got %s", result.Status)
+	}
+	if result.Handoff["from_pack"] != "wxt-manifest" {
+		t.Fatalf("expected wxt-manifest handoff source, got %+v", result.Handoff)
+	}
+	toPacks, ok := result.Handoff["to_packs"].([]string)
+	if !ok {
+		t.Fatalf("expected typed to_packs slice, got %#v", result.Handoff["to_packs"])
+	}
+	if len(toPacks) != 2 || toPacks[0] != "security-permissions" || toPacks[1] != "release-store-review" {
+		t.Fatalf("unexpected to_packs: %+v", toPacks)
+	}
+	carry, ok := result.Handoff["carry_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected carry_context map, got %#v", result.Handoff["carry_context"])
+	}
+	if carry["required_artifact"] != "manifest-review.md" {
+		t.Fatalf("unexpected required_artifact: %+v", carry)
+	}
+	checks, ok := carry["required_checks"].([]string)
+	if !ok {
+		t.Fatalf("expected typed required_checks slice, got %#v", carry["required_checks"])
+	}
+	if len(checks) != 2 || checks[0] != "security-permissions-ready" || checks[1] != "release-store-review-ready" {
+		t.Fatalf("unexpected required_checks: %+v", checks)
+	}
+}

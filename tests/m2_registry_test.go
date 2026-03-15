@@ -29,6 +29,34 @@ func TestM2RegistryLoadsAndValidates(t *testing.T) {
 	}
 }
 
+func TestM2RegistryCapabilityPackagesProvideValidatorsAndArtifacts(t *testing.T) {
+	root := projectRoot(t)
+	reg, err := registry.Load(filepath.Join(root, "workflow-packages", "registry.json"))
+	if err != nil {
+		t.Fatalf("load registry failed: %v", err)
+	}
+	securityEntry, ok := registry.FindByName(reg, "security-permissions")
+	if !ok {
+		t.Fatalf("expected security-permissions in registry")
+	}
+	if len(securityEntry.RecommendedValidators) != 1 || securityEntry.RecommendedValidators[0] != "validator-core-output" {
+		t.Fatalf("unexpected security validators: %+v", securityEntry.RecommendedValidators)
+	}
+	if len(securityEntry.RecommendedArtifacts) != 1 || securityEntry.RecommendedArtifacts[0] != "permissions-review.md" {
+		t.Fatalf("unexpected security artifacts: %+v", securityEntry.RecommendedArtifacts)
+	}
+	releaseEntry, ok := registry.FindByName(reg, "release-store-review")
+	if !ok {
+		t.Fatalf("expected release-store-review in registry")
+	}
+	if len(releaseEntry.RecommendedValidators) != 1 || releaseEntry.RecommendedValidators[0] != "validator-core-output" {
+		t.Fatalf("unexpected release validators: %+v", releaseEntry.RecommendedValidators)
+	}
+	if len(releaseEntry.RecommendedArtifacts) != 1 || releaseEntry.RecommendedArtifacts[0] != "store-review.md" {
+		t.Fatalf("unexpected release artifacts: %+v", releaseEntry.RecommendedArtifacts)
+	}
+}
+
 func TestM2RegistryReservedBareNameRejected(t *testing.T) {
 	root := projectRoot(t)
 	reg, err := registry.Load(filepath.Join(root, "workflow-packages", "registry.json"))
