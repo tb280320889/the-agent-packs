@@ -1,0 +1,40 @@
+# Context Snapshot: 改造计划 v1 M1 分层索引与总编排草案
+
+## 1. 当前阶段
+- 所属里程碑：M1
+- 关联 bead：the-agent-packs-nm4
+- 当前状态：in_progress
+
+## 2. 当前事实
+- 当前要解决的问题：把当前平铺式 route 抽象成“总编排 -> 主域编排 -> 横线挂接”的两段式候选裁剪模型，并给 M2 留下注册表字段需求。
+- 当前已完成内容：已补充 M1 文档中的共享产物要求、给 M2 的最小输入要求、节点分类到注册表字段的映射建议，以及从当前实现到目标模型的差异摘要。
+- 当前尚未完成内容：尚未形成实现型 bead；当前阶段仍以结构设计与最小交接为主。
+
+## 3. 已冻结对象
+- M0 冻结对象不变：Activation Request、Routing Result、Context Bundle、Artifact、Handoff Bundle、Validation Plan、Validator Result、Activation Result。
+- M1 结构判断：第一轮先做主域筛选，第二轮再做域内 workflow 选择，横线能力默认 attach-only。
+
+## 4. 当前输入
+- 上游交付物：`the-agent-packs-j03` 初始化文档包与 M0 冻结文档。
+- 依赖文档：`docs/改造计划v1/20-M1_分层索引与总编排骨架_开发指导.md`、`docs/改造计划v1/21-M1_上下文_节点分类_作用域与可见性.md`、`docs/改造计划v1/22-M1_上下文_Routing分层化与候选集裁剪.md`。
+- 依赖实现：`internal/query/query.go` 当前平铺 route 实现、`blueprint/schema.md` 当前最薄索引 schema。
+
+## 5. 当前输出
+- 已更新文件：
+  - `docs/改造计划v1/20-M1_分层索引与总编排骨架_开发指导.md`
+  - `docs/改造计划v1/21-M1_上下文_节点分类_作用域与可见性.md`
+  - `docs/改造计划v1/22-M1_上下文_Routing分层化与候选集裁剪.md`
+- 已产出文件：
+  - `docs/改造计划v1/context-snapshots/2026-03-15-m1-layered-routing.md`
+- 已创建 bead：`the-agent-packs-nm4`
+
+## 6. 风险与阻塞
+- 风险：若没有实现型 bead 继续承接，M1 仍可能停留在文档层设计，无法验证与现有 query 实现的映射精度。
+- 风险：若 M2 不直接消费 M1 的字段映射，注册表字段仍可能重复设计。
+- 阻塞：无。
+- 是否需要 breaking 评估：否（当前仍是结构设计与交接补强，不改正式顶层协议）。
+
+## 7. 下一步建议
+- 建议下一个 bead：围绕 `internal/query/query.go` 与 Blueprint/frontmatter/schema 设计“实现前差异清单”或“分层 route 实现草案” bead。
+- 建议先阅读的文档：`docs/改造计划v1/30-M2_package注册表与命名空间治理_开发指导.md`、`docs/改造计划v1/31-M2_上下文_命名规则_注册表字段与冲突裁决.md`。
+- 建议先验证的命令：`go test ./...`、`bd show the-agent-packs-nm4 --json`。
