@@ -4,6 +4,9 @@ level: L0
 domain: release
 subdomain: null
 capability: null
+node_kind: capability-root
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Release
 summary: Enter when the task涉及商店审核、发布与合规检查；作为 cross-cutting line 参与其他主域。
 aliases:

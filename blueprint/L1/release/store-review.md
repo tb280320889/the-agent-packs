@@ -4,6 +4,9 @@ level: L1
 domain: release
 subdomain: store-review
 capability: null
+node_kind: workflow-entry
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Store Review
 summary: Prepare browser extension submissions by aligning manifest, permissions, and policy checks.
 aliases:

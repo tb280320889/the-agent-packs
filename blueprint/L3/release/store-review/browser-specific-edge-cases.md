@@ -4,6 +4,9 @@ level: L3
 domain: release
 subdomain: store-review
 capability: null
+node_kind: execution-strategy
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Store Review Browser Edge Cases
 summary: Capture browser-specific store review edge cases for extension submissions.
 aliases:

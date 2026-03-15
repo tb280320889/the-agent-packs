@@ -4,6 +4,9 @@ level: L3
 domain: wxt
 subdomain: manifest
 capability: null
+node_kind: execution-strategy
+visibility_scope: domain-scoped
+activation_mode: direct
 title: Manifest Edge Cases
 summary: Capture edge cases for WXT manifest handling across browsers and store rules.
 aliases:

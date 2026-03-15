@@ -4,6 +4,9 @@ level: L0
 domain: wxt
 subdomain: null
 capability: null
+node_kind: domain-root
+visibility_scope: global
+activation_mode: direct
 title: WXT
 summary: Enter when the task is about browser extension workflows using WXT; avoid when the host is not a web extension project.
 aliases:

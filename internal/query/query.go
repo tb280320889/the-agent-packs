@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,6 +25,18 @@ type packProfile struct {
 	PackName              string
 	RecommendedValidators []string
 	RecommendedArtifacts  []string
+}
+
+type nodeRecord struct {
+	ID              string
+	Level           string
+	Domain          string
+	Subdomain       string
+	NodeKind        string
+	VisibilityScope string
+	ActivationMode  string
+	Title           string
+	Summary         string
 }
 
 var nodeProfileMap = map[string]packProfile{
@@ -67,32 +80,42 @@ func OpenDB(dbPath string) (*sql.DB, error) {
 	return sql.Open("sqlite", dbPath)
 }
 
-func fetchNodes(db *sql.DB, level *string) ([][6]string, error) {
+func fetchNodes(db *sql.DB, level *string) ([]nodeRecord, error) {
 	rows := &sql.Rows{}
 	var err error
 	if level != nil {
-		rows, err = db.Query("SELECT id, level, domain, subdomain, title, summary FROM nodes WHERE level = ?", *level)
+		rows, err = db.Query("SELECT id, level, domain, subdomain, node_kind, visibility_scope, activation_mode, title, summary FROM nodes WHERE level = ?", *level)
 	} else {
-		rows, err = db.Query("SELECT id, level, domain, subdomain, title, summary FROM nodes")
+		rows, err = db.Query("SELECT id, level, domain, subdomain, node_kind, visibility_scope, activation_mode, title, summary FROM nodes")
 	}
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	result := make([][6]string, 0)
+	result := make([]nodeRecord, 0)
 	for rows.Next() {
-		var id, lv, domain string
+		var id, lv, domain, nodeKind, visibilityScope, activationMode string
 		var subdomain sql.NullString
 		var title, summary string
-		if err := rows.Scan(&id, &lv, &domain, &subdomain, &title, &summary); err != nil {
+		if err := rows.Scan(&id, &lv, &domain, &subdomain, &nodeKind, &visibilityScope, &activationMode, &title, &summary); err != nil {
 			return nil, err
 		}
 		sub := ""
 		if subdomain.Valid {
 			sub = subdomain.String
 		}
-		result = append(result, [6]string{id, lv, domain, sub, title, summary})
+		result = append(result, nodeRecord{
+			ID:              id,
+			Level:           lv,
+			Domain:          domain,
+			Subdomain:       sub,
+			NodeKind:        nodeKind,
+			VisibilityScope: visibilityScope,
+			ActivationMode:  activationMode,
+			Title:           title,
+			Summary:         summary,
+		})
 	}
 	return result, nil
 }
@@ -136,6 +159,19 @@ func fetchEdges(db *sql.DB, sourceID, edgeType string) ([]string, error) {
 		list = append(list, target)
 	}
 	return list, nil
+}
+
+func fetchNodeRecord(db *sql.DB, nodeID string) (nodeRecord, error) {
+	row := db.QueryRow("SELECT id, level, domain, subdomain, node_kind, visibility_scope, activation_mode, title, summary FROM nodes WHERE id = ?", nodeID)
+	var rec nodeRecord
+	var subdomain sql.NullString
+	if err := row.Scan(&rec.ID, &rec.Level, &rec.Domain, &subdomain, &rec.NodeKind, &rec.VisibilityScope, &rec.ActivationMode, &rec.Title, &rec.Summary); err != nil {
+		return nodeRecord{}, err
+	}
+	if subdomain.Valid {
+		rec.Subdomain = subdomain.String
+	}
+	return rec, nil
 }
 
 func tokenize(s string) string {
@@ -182,11 +218,11 @@ func evidenceScore(taskText string, selectedFiles, configFragments, contextHints
 	return score, reason
 }
 
-func scoreCandidate(task string, candidate [6]string, meta map[string][]string, targetDomain *string, selectedFiles, configFragments, contextHints []string) (float64, []string) {
+func scoreCandidate(task string, candidate nodeRecord, meta map[string][]string, targetDomain *string, selectedFiles, configFragments, contextHints []string) (float64, []string) {
 	score := 0.0
 	reason := make([]string, 0)
 	taskText := tokenize(task)
-	if targetDomain != nil && candidate[2] == *targetDomain {
+	if targetDomain != nil && candidate.Domain == *targetDomain {
 		score += 3.0
 		reason = append(reason, "target_domain match")
 	}
@@ -200,19 +236,80 @@ func scoreCandidate(task string, candidate [6]string, meta map[string][]string, 
 	return score, reason
 }
 
+func domainNodeAllowedInGlobal(candidate nodeRecord) bool {
+	if candidate.ActivationMode == "attach-only" {
+		return false
+	}
+	return candidate.NodeKind == "domain-root" || candidate.NodeKind == "domain-orchestrator"
+}
+
+func workflowNodeAllowedInDomain(candidate nodeRecord, activeDomain string) bool {
+	if candidate.Domain != activeDomain {
+		return false
+	}
+	if candidate.ActivationMode == "attach-only" {
+		return false
+	}
+	if candidate.VisibilityScope == "domain-scoped" || candidate.VisibilityScope == "global" {
+		return candidate.NodeKind == "workflow-entry" || candidate.NodeKind == "domain-orchestrator"
+	}
+	return false
+}
+
+func capabilityAttachAllowed(candidate nodeRecord, activeDomain string) bool {
+	if activeDomain == "" {
+		return false
+	}
+	if candidate.ActivationMode != "attach-only" {
+		return false
+	}
+	return candidate.VisibilityScope == "capability-scoped" || candidate.VisibilityScope == "domain-scoped"
+}
+
+func inferMainDomain(task string, selectedFiles, configFragments, contextHints []string) string {
+	taskText := tokenize(task)
+	joined := strings.Join(append(append([]string{}, selectedFiles...), append(configFragments, contextHints...)...), " ")
+	evidence := tokenize(joined)
+	if strings.Contains(taskText, "wxt") || strings.Contains(taskText, "browser extension") || strings.Contains(evidence, "wxt") || strings.Contains(evidence, "manifest") {
+		return "wxt"
+	}
+	return ""
+}
+
+func buildCandidate(candidate nodeRecord, score float64, reason []string) model.RouteCandidate {
+	return model.RouteCandidate{
+		ID:              candidate.ID,
+		Title:           candidate.Title,
+		Summary:         candidate.Summary,
+		Score:           score,
+		Reason:          reason,
+		NodeKind:        candidate.NodeKind,
+		VisibilityScope: candidate.VisibilityScope,
+		ActivationMode:  candidate.ActivationMode,
+	}
+}
+
 func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targetDomain *string, selectedFiles, configFragments, contextHints []string, maxResults int) (model.RouteResult, error) {
 	if targetPack != nil {
 		if mappedNode, ok := packNodeMap[*targetPack]; ok {
+			directRec, recErr := fetchNodeRecord(db, mappedNode)
 			direct, err := ReadNode(db, mappedNode, "summary")
-			if err == nil && direct != nil && direct.Level == level {
+			if err == nil && recErr == nil && direct != nil && direct.Level == level {
 				must, _ := fetchEdges(db, direct.ID, "required_with")
+				reason := []string{"target_pack match"}
+				if targetDomain != nil {
+					reason = append(reason, fmt.Sprintf("target_domain=%s bypassed by explicit target_pack", *targetDomain))
+				}
 				return model.RouteResult{
 					Candidates: []model.RouteCandidate{{
-						ID:      direct.ID,
-						Title:   direct.Title,
-						Summary: direct.Summary,
-						Score:   99.0,
-						Reason:  []string{"target_pack match"},
+						ID:              direct.ID,
+						Title:           direct.Title,
+						Summary:         direct.Summary,
+						Score:           99.0,
+						Reason:          reason,
+						NodeKind:        directRec.NodeKind,
+						VisibilityScope: directRec.VisibilityScope,
+						ActivationMode:  directRec.ActivationMode,
 					}},
 					MustInclude: must,
 				}, nil
@@ -226,12 +323,19 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 		return model.RouteResult{}, err
 	}
 
-	candidates := make([]model.RouteCandidate, 0)
+	activeDomain := ""
+	if targetDomain != nil {
+		activeDomain = *targetDomain
+	} else {
+		activeDomain = inferMainDomain(task, selectedFiles, configFragments, contextHints)
+	}
+
+	globalCandidates := make([]model.RouteCandidate, 0)
+	workflowCandidates := make([]model.RouteCandidate, 0)
+	attachIDs := make([]string, 0)
+
 	for _, row := range nodes {
-		if targetDomain != nil && row[2] != *targetDomain {
-			continue
-		}
-		meta, err := fetchMeta(db, row[0])
+		meta, err := fetchMeta(db, row.ID)
 		if err != nil {
 			return model.RouteResult{}, err
 		}
@@ -247,37 +351,65 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 			continue
 		}
 		score, reason := scoreCandidate(task, row, meta, targetDomain, selectedFiles, configFragments, contextHints)
-		if score > 0 {
-			candidates = append(candidates, model.RouteCandidate{
-				ID:      row[0],
-				Title:   row[4],
-				Summary: row[5],
-				Score:   score,
-				Reason:  reason,
-			})
+		if score <= 0 {
+			continue
+		}
+
+		if level == "L0" && domainNodeAllowedInGlobal(row) {
+			reason = append(reason, "global_candidate_space")
+			globalCandidates = append(globalCandidates, buildCandidate(row, score, reason))
+			continue
+		}
+		if level == "L1" && workflowNodeAllowedInDomain(row, activeDomain) {
+			reason = append(reason, "domain_candidate_space")
+			workflowCandidates = append(workflowCandidates, buildCandidate(row, score, reason))
+			continue
+		}
+		if level == "L1" && capabilityAttachAllowed(row, activeDomain) {
+			attachIDs = append(attachIDs, row.ID)
 		}
 	}
 
-	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].Score == candidates[j].Score {
-			return candidates[i].ID < candidates[j].ID
+	sort.Slice(globalCandidates, func(i, j int) bool {
+		if globalCandidates[i].Score == globalCandidates[j].Score {
+			return globalCandidates[i].ID < globalCandidates[j].ID
 		}
-		return candidates[i].Score > candidates[j].Score
+		return globalCandidates[i].Score > globalCandidates[j].Score
+	})
+	sort.Slice(workflowCandidates, func(i, j int) bool {
+		if workflowCandidates[i].Score == workflowCandidates[j].Score {
+			return workflowCandidates[i].ID < workflowCandidates[j].ID
+		}
+		return workflowCandidates[i].Score > workflowCandidates[j].Score
 	})
 
 	if maxResults <= 0 {
 		maxResults = 3
 	}
-	if len(candidates) > maxResults {
-		candidates = candidates[:maxResults]
+
+	selected := workflowCandidates
+	if level == "L0" {
+		selected = globalCandidates
+	}
+	if len(selected) > maxResults {
+		selected = selected[:maxResults]
 	}
 
 	must := []string{}
-	if len(candidates) > 0 {
-		must, _ = fetchEdges(db, candidates[0].ID, "required_with")
+	if len(selected) > 0 {
+		must, _ = fetchEdges(db, selected[0].ID, "required_with")
+		seen := map[string]bool{}
+		for _, id := range must {
+			seen[id] = true
+		}
+		for _, id := range attachIDs {
+			if !seen[id] {
+				must = append(must, id)
+			}
+		}
 	}
 
-	return model.RouteResult{Candidates: candidates, MustInclude: must}, nil
+	return model.RouteResult{Candidates: selected, MustInclude: must}, nil
 }
 
 func ReadNode(db *sql.DB, nodeID string, section string) (*model.NodeSummary, error) {

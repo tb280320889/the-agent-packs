@@ -4,6 +4,9 @@ level: L2
 domain: release
 subdomain: store-review
 capability: null
+node_kind: execution-strategy
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Browser Extension Store Checklist
 summary: Build a checklist covering manifest, permissions, and policy alignment for store submission.
 aliases:

@@ -34,6 +34,9 @@ var requiredKeys = []string{
 	"children",
 	"entry_conditions",
 	"stop_conditions",
+	"node_kind",
+	"visibility_scope",
+	"activation_mode",
 }
 
 func parseFrontmatter(text string) (map[string]any, string, error) {
@@ -123,6 +126,17 @@ func checksumText(text string) string {
 }
 
 func ensureSchema(db *sql.DB) error {
+	resetStmts := []string{
+		`DROP TABLE IF EXISTS edges`,
+		`DROP TABLE IF EXISTS node_meta`,
+		`DROP TABLE IF EXISTS nodes`,
+	}
+	for _, s := range resetStmts {
+		if _, err := db.Exec(s); err != nil {
+			return err
+		}
+	}
+
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS nodes (
 			id TEXT PRIMARY KEY,
@@ -130,6 +144,9 @@ func ensureSchema(db *sql.DB) error {
 			domain TEXT,
 			subdomain TEXT,
 			capability TEXT,
+			node_kind TEXT,
+			visibility_scope TEXT,
+			activation_mode TEXT,
 			title TEXT,
 			summary TEXT,
 			path TEXT,
@@ -286,6 +303,10 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 			})
 			continue
 		}
+		if asString(fm["node_kind"]) == "" || asString(fm["visibility_scope"]) == "" || asString(fm["activation_mode"]) == "" {
+			errs = append(errs, map[string]string{"path": p, "error": "routing classification keys must be non-empty"})
+			continue
+		}
 
 		derivedID := deriveID(levelDir, domainDir, subdomainDir, stem)
 		if asString(fm["id"]) != derivedID {
@@ -320,6 +341,9 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 			Domain:              asString(fm["domain"]),
 			Subdomain:           asStringPtr(fm["subdomain"]),
 			Capability:          asStringPtr(fm["capability"]),
+			NodeKind:            asString(fm["node_kind"]),
+			VisibilityScope:     asString(fm["visibility_scope"]),
+			ActivationMode:      asString(fm["activation_mode"]),
 			Title:               asString(fm["title"]),
 			Summary:             asString(fm["summary"]),
 			Path:                filepath.ToSlash(filepath.Join("blueprint", rel)),
@@ -379,14 +403,17 @@ func writeIndex(dbPath string, nodes []model.Node, metas []model.NodeMeta, edges
 
 	for _, n := range nodes {
 		_, err := db.Exec(
-			`INSERT INTO nodes (id, level, domain, subdomain, capability, title, summary, path, parent_id, body_md,
+			`INSERT INTO nodes (id, level, domain, subdomain, capability, node_kind, visibility_scope, activation_mode, title, summary, path, parent_id, body_md,
 			entry_conditions_json, stop_conditions_json, checksum, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			n.ID,
 			n.Level,
 			n.Domain,
 			n.Subdomain,
 			n.Capability,
+			n.NodeKind,
+			n.VisibilityScope,
+			n.ActivationMode,
 			n.Title,
 			n.Summary,
 			n.Path,

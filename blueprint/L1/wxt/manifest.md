@@ -4,6 +4,9 @@ level: L1
 domain: wxt
 subdomain: manifest
 capability: null
+node_kind: workflow-entry
+visibility_scope: domain-scoped
+activation_mode: direct
 title: WXT Manifest
 summary: Review WXT manifest generation rules, browser overrides, permissions, and store-facing risks.
 aliases:

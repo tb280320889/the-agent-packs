@@ -4,6 +4,9 @@ level: L2
 domain: security
 subdomain: permissions
 capability: null
+node_kind: execution-strategy
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Permissions Minimization
 summary: Provide concrete steps to minimize permissions while preserving required functionality.
 aliases:

@@ -4,6 +4,9 @@ level: L1
 domain: security
 subdomain: permissions
 capability: null
+node_kind: workflow-entry
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Permissions Review
 summary: Assess permission scope, minimize sensitive capabilities, and surface security risks for store review.
 aliases:

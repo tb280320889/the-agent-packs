@@ -99,6 +99,9 @@ func TestM3NegativeWrongTargetPackNotOverriddenByHint(t *testing.T) {
 	if len(result.Candidates) == 0 || result.Candidates[0].ID != "L1.security.permissions" {
 		t.Fatalf("expected target_pack to keep priority, got %+v", result.Candidates)
 	}
+	if result.Candidates[0].ActivationMode != "attach-only" {
+		t.Fatalf("expected attach-only metadata to be preserved, got %+v", result.Candidates[0])
+	}
 }
 
 func TestM3NegativeBundleNotDefaultDeepRead(t *testing.T) {

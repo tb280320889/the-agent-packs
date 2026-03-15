@@ -11,6 +11,9 @@
 | domain | text | 一级域 |
 | subdomain | text | 子域 |
 | capability | text | 能力线或 null |
+| node_kind | text | domain-root/domain-orchestrator/capability-root/workflow-entry/execution-strategy |
+| visibility_scope | text | global/domain-scoped/capability-scoped |
+| activation_mode | text | direct/attach-only |
 | title | text | 节点标题 |
 | summary | text | 最小摘要 |
 | path | text | 源文件路径 |

@@ -94,6 +94,9 @@ func TestRouteTargetPackHasHighestPriority(t *testing.T) {
 	if result.Candidates[0].ID != "L1.security.permissions" {
 		t.Fatalf("unexpected candidate: %s", result.Candidates[0].ID)
 	}
+	if result.Candidates[0].ActivationMode != "attach-only" {
+		t.Fatalf("expected attach-only candidate metadata, got %+v", result.Candidates[0])
+	}
 	found := false
 	for _, r := range result.Candidates[0].Reason {
 		if r == "target_pack match" {
@@ -124,6 +127,9 @@ func TestRouteRespectsTargetDomain(t *testing.T) {
 		if len(segments) < 2 || segments[1] != "wxt" {
 			t.Fatalf("candidate not in wxt domain: %s", c.ID)
 		}
+		if c.ActivationMode == "attach-only" {
+			t.Fatalf("attach-only candidate should not enter domain competition: %+v", c)
+		}
 	}
 }
 
@@ -140,6 +146,62 @@ func TestRouteTargetPackOverridesTargetDomainConflict(t *testing.T) {
 	}
 	if len(result.Candidates) == 0 || result.Candidates[0].ID != "L1.security.permissions" {
 		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestRouteL0OnlyReturnsDomainRootCandidates(t *testing.T) {
+	dbPath := compileMainIndex(t)
+	db := openDB(t, dbPath)
+	defer db.Close()
+
+	result, err := query.RouteQuery(db, "L0", "review browser extension manifest permissions", nil, nil, []string{"wxt.config.ts"}, []string{"manifest.permissions"}, []string{"browser-extension"}, 3)
+	if err != nil {
+		t.Fatalf("route query failed: %v", err)
+	}
+	if len(result.Candidates) == 0 {
+		t.Fatalf("expected L0 candidates")
+	}
+	if result.Candidates[0].ID != "L0.wxt" {
+		t.Fatalf("expected global route to pick L0.wxt, got %+v", result.Candidates)
+	}
+	if result.Candidates[0].NodeKind != "domain-root" {
+		t.Fatalf("expected domain-root metadata, got %+v", result.Candidates[0])
+	}
+}
+
+func TestRouteDomainCompetitionExcludesAttachOnlyCapability(t *testing.T) {
+	dbPath := compileMainIndex(t)
+	db := openDB(t, dbPath)
+	defer db.Close()
+
+	td := "wxt"
+	result, err := query.RouteQuery(db, "L1", "permissions review for browser extension manifest", nil, &td, []string{"wxt.config.ts"}, []string{"manifest.permissions"}, []string{"browser-extension"}, 3)
+	if err != nil {
+		t.Fatalf("route query failed: %v", err)
+	}
+	if len(result.Candidates) == 0 {
+		t.Fatalf("expected L1 candidates")
+	}
+	if result.Candidates[0].ID != "L1.wxt.manifest" {
+		t.Fatalf("expected workflow candidate to win domain competition, got %+v", result.Candidates)
+	}
+	for _, c := range result.Candidates {
+		if c.ID == "L1.security.permissions" || c.ID == "L1.release.store-review" {
+			t.Fatalf("attach-only capability leaked into main candidate list: %+v", result.Candidates)
+		}
+	}
+	foundSecurity := false
+	foundRelease := false
+	for _, id := range result.MustInclude {
+		if id == "L1.security.permissions" {
+			foundSecurity = true
+		}
+		if id == "L1.release.store-review" {
+			foundRelease = true
+		}
+	}
+	if !foundSecurity || !foundRelease {
+		t.Fatalf("expected attach-only capabilities in must_include, got %+v", result.MustInclude)
 	}
 }
 
@@ -165,7 +227,7 @@ func TestFrontmatterSummaryWithColon(t *testing.T) {
 		t.Fatalf("mkdir failed: %v", err)
 	}
 	filePath := filepath.Join(l0Dir, "overview.md")
-	content := "---\nid: L0.demo\nlevel: L0\ndomain: demo\nsubdomain: null\ncapability: null\ntitle: Demo\nsummary: This summary has colon: valid content\naliases: []\ntriggers:\n  - demo\nanti_triggers: []\nrequired_with: []\nmay_include: []\nchildren: []\nentry_conditions: []\nstop_conditions: []\n---\n\ndemo body\n"
+	content := "---\nid: L0.demo\nlevel: L0\ndomain: demo\nsubdomain: null\ncapability: null\nnode_kind: domain-root\nvisibility_scope: global\nactivation_mode: direct\ntitle: Demo\nsummary: This summary has colon: valid content\naliases: []\ntriggers:\n  - demo\nanti_triggers: []\nrequired_with: []\nmay_include: []\nchildren: []\nentry_conditions: []\nstop_conditions: []\n---\n\ndemo body\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("write file failed: %v", err)
 	}

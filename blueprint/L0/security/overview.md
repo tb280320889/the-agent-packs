@@ -4,6 +4,9 @@ level: L0
 domain: security
 subdomain: null
 capability: null
+node_kind: capability-root
+visibility_scope: capability-scoped
+activation_mode: attach-only
 title: Security
 summary: Enter when a task涉及权限、敏感数据或合规风险；作为 cross-cutting line 参与其他主域。
 aliases:

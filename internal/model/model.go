@@ -6,6 +6,9 @@ type Node struct {
 	Domain              string
 	Subdomain           *string
 	Capability          *string
+	NodeKind            string
+	VisibilityScope     string
+	ActivationMode      string
 	Title               string
 	Summary             string
 	Path                string
@@ -32,11 +35,14 @@ type Edge struct {
 }
 
 type RouteCandidate struct {
-	ID      string   `json:"id"`
-	Title   string   `json:"title"`
-	Summary string   `json:"summary"`
-	Score   float64  `json:"score"`
-	Reason  []string `json:"reason"`
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Summary         string   `json:"summary"`
+	Score           float64  `json:"score"`
+	Reason          []string `json:"reason"`
+	NodeKind        string   `json:"node_kind,omitempty"`
+	VisibilityScope string   `json:"visibility_scope,omitempty"`
+	ActivationMode  string   `json:"activation_mode,omitempty"`
 }
 
 type RouteResult struct {

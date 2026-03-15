@@ -4,6 +4,9 @@ level: L2
 domain: wxt
 subdomain: manifest
 capability: null
+node_kind: execution-strategy
+visibility_scope: domain-scoped
+activation_mode: direct
 title: Manifest Browser Overrides
 summary: Adjust manifest overrides per browser differences and store requirements.
 aliases:
