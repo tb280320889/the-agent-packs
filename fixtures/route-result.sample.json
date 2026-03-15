@@ -1,0 +1,8 @@
+{
+  "main_pack": "wxt-manifest",
+  "main_blueprint_node": "L1.wxt.manifest",
+  "required_packs": ["security-permissions", "release-store-review"],
+  "route_reason": "target_domain=wxt and triggers match manifest/permissions; attach security and release cross-cutting lines",
+  "recommended_validators": [],
+  "recommended_artifacts": []
+}
