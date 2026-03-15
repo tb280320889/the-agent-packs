@@ -8,4 +8,4 @@
 - 明确不要做什么
 - 明确风险、未决项和推荐下一动作
 
-写作模板见：`docs/03-统一Handoff_ContextSnapshot_共享文档模板.md`
+写作模板见：`docs/05-统一Handoff_ContextSnapshot_共享文档模板.md`
