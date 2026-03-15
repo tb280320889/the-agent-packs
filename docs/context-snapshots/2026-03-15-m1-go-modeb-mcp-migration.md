@@ -1,5 +1,7 @@
 # Context Snapshot: M1 Go模式B MCP迁移
 
+> 弃用说明：本文件属于正式主线 `docs/00~52` 的历史快照，仅保留用于追溯；改造计划 v1 请改读 `docs/改造计划v1/context-snapshots/`。
+
 ## 1. 当前阶段
 - 所属里程碑：M1
 - 关联 bead：the-agent-packs-ld9

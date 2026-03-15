@@ -1,5 +1,7 @@
 # Handoff: M1 Blueprint 知识骨架与最薄入口（完成）
 
+> 弃用说明：本文件属于正式主线 `docs/00~52` 的历史交接，仅保留用于追溯；改造计划 v1 请改读 `docs/改造计划v1/handoffs/`。
+
 ## 1. 交接对象
 - 来源 bead：the-agent-packs-695
 - 下一 bead：待创建（建议 M2 kickoff）
