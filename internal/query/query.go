@@ -20,6 +20,46 @@ var packNodeMap = map[string]string{
 	"release-store-review": "L1.release.store-review",
 }
 
+type packProfile struct {
+	PackName              string
+	RecommendedValidators []string
+	RecommendedArtifacts  []string
+}
+
+var nodeProfileMap = map[string]packProfile{
+	"L1.wxt.manifest": {
+		PackName:              "wxt-manifest",
+		RecommendedValidators: []string{"validator-core-output", "validator-domain-wxt-manifest"},
+		RecommendedArtifacts:  []string{"manifest-review.md"},
+	},
+	"L1.security.permissions": {
+		PackName:              "security-permissions",
+		RecommendedValidators: []string{},
+		RecommendedArtifacts:  []string{},
+	},
+	"L1.release.store-review": {
+		PackName:              "release-store-review",
+		RecommendedValidators: []string{},
+		RecommendedArtifacts:  []string{},
+	},
+}
+
+func PackForNode(nodeID string) string {
+	profile, ok := nodeProfileMap[nodeID]
+	if !ok {
+		return ""
+	}
+	return profile.PackName
+}
+
+func profileForNode(nodeID string) packProfile {
+	profile, ok := nodeProfileMap[nodeID]
+	if !ok {
+		return packProfile{}
+	}
+	return profile
+}
+
 func OpenDB(dbPath string) (*sql.DB, error) {
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil, err
@@ -273,6 +313,9 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		return bundle, nil
 	}
 	bundle.Main = main
+	profile := profileForNode(mainNode)
+	bundle.RecommendedValidators = append(bundle.RecommendedValidators, profile.RecommendedValidators...)
+	bundle.RecommendedArtifacts = append(bundle.RecommendedArtifacts, profile.RecommendedArtifacts...)
 
 	appendNode := func(targetID string, collection *[]model.NodeSummary) error {
 		node, err := ReadNode(db, targetID, "summary")

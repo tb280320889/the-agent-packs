@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "manifest-review artifact",
+  "type": "object",
+  "required": [
+    "task_summary",
+    "main_pack",
+    "required_packs",
+    "manifest_risk_summary",
+    "permissions_review",
+    "browser_overrides_notes",
+    "store_risks",
+    "validator_expectations",
+    "next_steps"
+  ],
+  "properties": {
+    "task_summary": { "type": "string" },
+    "main_pack": { "type": "string", "const": "wxt-manifest" },
+    "required_packs": { "type": "array", "items": { "type": "string" } },
+    "manifest_risk_summary": { "type": "array", "items": { "type": "string" } },
+    "permissions_review": { "type": "array", "items": { "type": "string" } },
+    "browser_overrides_notes": { "type": "array", "items": { "type": "string" } },
+    "store_risks": { "type": "array", "items": { "type": "string" } },
+    "validator_expectations": { "type": "array", "items": { "type": "string" } },
+    "next_steps": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

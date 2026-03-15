@@ -21,6 +21,11 @@
   ],
   "execution_children": [],
   "deferred": [],
-  "recommended_validators": [],
-  "recommended_artifacts": []
+  "recommended_validators": [
+    "validator-core-output",
+    "validator-domain-wxt-manifest"
+  ],
+  "recommended_artifacts": [
+    "manifest-review.md"
+  ]
 }

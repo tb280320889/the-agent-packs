@@ -2,8 +2,61 @@
   "request_id": "req-0001",
   "status": "completed",
   "main_pack": "wxt-manifest",
-  "artifacts": [],
-  "validation_results": [],
+  "artifacts": [
+    {
+      "name": "manifest-review.md",
+      "kind": "review-report"
+    }
+  ],
+  "validation_results": [
+    {
+      "validation_plan": {
+        "plan_id": "req-0001-validation-plan",
+        "request_id": "req-0001",
+        "main_pack": "wxt-manifest",
+        "validators": [
+          {
+            "name": "validator-core-output",
+            "scope": "artifact",
+            "reason": "All output artifacts must satisfy envelope completeness."
+          },
+          {
+            "name": "validator-domain-wxt-manifest",
+            "scope": "domain",
+            "reason": "Manifest review must cover permission and store-facing risks."
+          }
+        ],
+        "artifacts_under_validation": [
+          "manifest-review.md"
+        ],
+        "severity_policy": {
+          "warn": "allow_partial",
+          "error": "block_completed"
+        },
+        "plan_reason": "Run core and domain validators for routed workflow package output."
+      },
+      "validator_results": [
+        {
+          "validator_name": "validator-core-output",
+          "status": "passed",
+          "findings": [],
+          "repair_suggestions": [],
+          "validated_artifacts": [
+            "manifest-review.md"
+          ]
+        },
+        {
+          "validator_name": "validator-domain-wxt-manifest",
+          "status": "passed",
+          "findings": [],
+          "repair_suggestions": [],
+          "validated_artifacts": [
+            "manifest-review.md"
+          ]
+        }
+      ]
+    }
+  ],
   "handoff": null,
   "summary": "route to L1.wxt.manifest with required cross-cutting lines"
 }
