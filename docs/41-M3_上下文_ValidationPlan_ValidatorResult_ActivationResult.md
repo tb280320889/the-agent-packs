@@ -158,3 +158,62 @@ Activation Result 是一次增强运行的统一结果容器。
 - 不能改 M0 冻结的 envelope 语义
 - 不能让 domain validator 改写 Activation Result 的顶层意义
 - 不能把 findings 写成无结构长文本
+
+---
+
+## 七、M3 冻结对象清单（字段级）
+
+### 1) Validation Plan（冻结）
+最小字段固定为：
+- `plan_id`
+- `request_id`
+- `main_pack`
+- `validators`
+- `artifacts_under_validation`
+- `severity_policy`
+- `plan_reason`
+
+`validators` 内元素固定最小字段：
+- `name`
+- `scope`
+- `reason`
+
+### 2) Validator Result（冻结）
+最小字段固定为：
+- `validator_name`
+- `status`
+- `findings`
+- `repair_suggestions`
+- `validated_artifacts`
+
+`findings` 内元素固定最小字段：
+- `severity`
+- `code`
+- `message`
+- `artifact_ref`
+
+### 3) Activation Result（冻结）
+顶层固定字段：
+- `request_id`
+- `status`
+- `main_pack`
+- `artifacts`
+- `validation_results`
+- `handoff`
+- `summary`
+
+`validation_results` 固定为计划与结果的封装对象：
+- `validation_plan`
+- `validator_results`
+
+### 4) 状态裁决规则（冻结）
+- `failed`：请求/路由不成立，或阻塞性失败（含 error 级发现）
+- `handoff`：到达包边界且 handoff bundle 完整
+- `partial`：上下文不足或非阻塞 warning
+- `completed`：核心产物完整且关键 validator 未失败
+
+优先级固定为：`failed > handoff > partial > completed`
+
+### 5) M3 固定 validator 清单（冻结）
+- `validator-core-output`
+- `validator-domain-wxt-manifest`

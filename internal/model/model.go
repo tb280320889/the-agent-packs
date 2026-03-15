@@ -62,11 +62,52 @@ type ContextBundle struct {
 }
 
 type ActivationResult struct {
-	RequestID         string `json:"request_id"`
-	Status            string `json:"status"`
-	MainPack          any    `json:"main_pack"`
-	Artifacts         []any  `json:"artifacts"`
-	ValidationResults []any  `json:"validation_results"`
-	Handoff           any    `json:"handoff"`
-	Summary           string `json:"summary"`
+	RequestID         string               `json:"request_id"`
+	Status            string               `json:"status"`
+	MainPack          *string              `json:"main_pack"`
+	Artifacts         []Artifact           `json:"artifacts"`
+	ValidationResults []ValidationEnvelope `json:"validation_results"`
+	Handoff           map[string]any       `json:"handoff"`
+	Summary           string               `json:"summary"`
+}
+
+type Artifact struct {
+	Name string `json:"name"`
+	Kind string `json:"kind"`
+}
+
+type ValidationPlan struct {
+	PlanID                   string            `json:"plan_id"`
+	RequestID                string            `json:"request_id"`
+	MainPack                 string            `json:"main_pack"`
+	Validators               []ValidatorPlan   `json:"validators"`
+	ArtifactsUnderValidation []string          `json:"artifacts_under_validation"`
+	SeverityPolicy           map[string]string `json:"severity_policy"`
+	PlanReason               string            `json:"plan_reason"`
+}
+
+type ValidatorPlan struct {
+	Name   string `json:"name"`
+	Scope  string `json:"scope"`
+	Reason string `json:"reason"`
+}
+
+type Finding struct {
+	Severity    string `json:"severity"`
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	ArtifactRef string `json:"artifact_ref"`
+}
+
+type ValidatorResult struct {
+	ValidatorName      string    `json:"validator_name"`
+	Status             string    `json:"status"`
+	Findings           []Finding `json:"findings"`
+	RepairSuggestions  []string  `json:"repair_suggestions"`
+	ValidatedArtifacts []string  `json:"validated_artifacts"`
+}
+
+type ValidationEnvelope struct {
+	ValidationPlan   ValidationPlan    `json:"validation_plan"`
+	ValidatorResults []ValidatorResult `json:"validator_results"`
 }

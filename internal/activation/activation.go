@@ -8,6 +8,7 @@ import (
 
 	"the-agent-packs/internal/model"
 	"the-agent-packs/internal/query"
+	"the-agent-packs/internal/validator"
 )
 
 type requestShape struct {
@@ -21,41 +22,11 @@ type requestShape struct {
 	ConfigFragments []string        `json:"config_fragments"`
 }
 
-type validationPlan struct {
-	PlanID                   string            `json:"plan_id"`
-	RequestID                string            `json:"request_id"`
-	MainPack                 string            `json:"main_pack"`
-	Validators               []validatorPlan   `json:"validators"`
-	ArtifactsUnderValidation []string          `json:"artifacts_under_validation"`
-	SeverityPolicy           map[string]string `json:"severity_policy"`
-	PlanReason               string            `json:"plan_reason"`
-}
-
-type validatorPlan struct {
-	Name   string `json:"name"`
-	Scope  string `json:"scope"`
-	Reason string `json:"reason"`
-}
-
-type finding struct {
-	Severity    string `json:"severity"`
-	Code        string `json:"code"`
-	Message     string `json:"message"`
-	ArtifactRef string `json:"artifact_ref"`
-}
-
-type validatorResult struct {
-	ValidatorName      string    `json:"validator_name"`
-	Status             string    `json:"status"`
-	Findings           []finding `json:"findings"`
-	RepairSuggestions  []string  `json:"repair_suggestions"`
-	ValidatedArtifacts []string  `json:"validated_artifacts"`
-}
-
 type boundedContext struct {
 	SelectedFiles   []string `json:"selected_files"`
 	ConfigFragments []string `json:"config_fragments"`
 	HostHints       []string `json:"host_hints"`
+	BrowserHints    []string `json:"browser_hints"`
 }
 
 func loadRequest(path string) (*requestShape, error) {
@@ -70,39 +41,37 @@ func loadRequest(path string) (*requestShape, error) {
 	return &req, nil
 }
 
-func activationResult(req *requestShape, mainPack any, routeReason string, status string) model.ActivationResult {
-	return model.ActivationResult{
-		RequestID:         req.RequestID,
-		Status:            status,
-		MainPack:          mainPack,
-		Artifacts:         []any{},
-		ValidationResults: []any{},
-		Handoff:           nil,
-		Summary:           routeReason,
+func ptr(s string) *string {
+	if s == "" {
+		return nil
 	}
+	v := s
+	return &v
 }
 
-func buildValidationPlan(req *requestShape, mainPack string, artifacts []string) validationPlan {
-	validators := []validatorPlan{
-		{
-			Name:   "validator-core-output",
-			Scope:  "artifact",
-			Reason: "All output artifacts must satisfy envelope completeness.",
-		},
-	}
+func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.Artifact) model.ValidationPlan {
+	validators := []model.ValidatorPlan{{
+		Name:   "validator-core-output",
+		Scope:  "artifact",
+		Reason: "All output artifacts must satisfy envelope completeness.",
+	}}
 	if mainPack == "wxt-manifest" {
-		validators = append(validators, validatorPlan{
+		validators = append(validators, model.ValidatorPlan{
 			Name:   "validator-domain-wxt-manifest",
 			Scope:  "domain",
 			Reason: "Manifest review must cover permission and store-facing risks.",
 		})
 	}
-	return validationPlan{
+	artifactNames := make([]string, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		artifactNames = append(artifactNames, artifact.Name)
+	}
+	return model.ValidationPlan{
 		PlanID:                   req.RequestID + "-validation-plan",
 		RequestID:                req.RequestID,
 		MainPack:                 mainPack,
 		Validators:               validators,
-		ArtifactsUnderValidation: artifacts,
+		ArtifactsUnderValidation: artifactNames,
 		SeverityPolicy: map[string]string{
 			"warn":  "allow_partial",
 			"error": "block_completed",
@@ -111,47 +80,7 @@ func buildValidationPlan(req *requestShape, mainPack string, artifacts []string)
 	}
 }
 
-func buildValidationResults(mainPack string, artifacts []string, status string) []any {
-	coreResult := validatorResult{
-		ValidatorName:      "validator-core-output",
-		Status:             "passed",
-		Findings:           []finding{},
-		RepairSuggestions:  []string{},
-		ValidatedArtifacts: artifacts,
-	}
-	results := []any{coreResult}
-	if mainPack != "wxt-manifest" {
-		return results
-	}
-	if status == "partial" {
-		results = append(results, validatorResult{
-			ValidatorName: "validator-domain-wxt-manifest",
-			Status:        "warned",
-			Findings: []finding{{
-				Severity:    "warn",
-				Code:        "insufficient-manifest-context",
-				Message:     "Bounded context is insufficient for a full manifest domain review.",
-				ArtifactRef: "manifest-review.md",
-			}},
-			RepairSuggestions: []string{
-				"Provide manifest permissions and host_permissions config fragments.",
-				"Provide target browser hints for override checks.",
-			},
-			ValidatedArtifacts: artifacts,
-		})
-		return results
-	}
-	results = append(results, validatorResult{
-		ValidatorName:      "validator-domain-wxt-manifest",
-		Status:             "passed",
-		Findings:           []finding{},
-		RepairSuggestions:  []string{},
-		ValidatedArtifacts: artifacts,
-	})
-	return results
-}
-
-func buildHandoff(mainPack string, task string) any {
+func buildHandoff(mainPack string, task string) map[string]any {
 	if mainPack != "wxt-manifest" {
 		return nil
 	}
@@ -172,26 +101,54 @@ func buildHandoff(mainPack string, task string) any {
 	}
 }
 
-func withExecutionPayload(base model.ActivationResult, req *requestShape, mainPack string, status string) model.ActivationResult {
-	artifacts := []string{"manifest-review.md"}
-	if mainPack != "wxt-manifest" {
-		artifacts = []string{}
+func hasBlockingFailure(policy map[string]string, results []model.ValidatorResult) bool {
+	for _, result := range results {
+		if result.Status == "failed" {
+			return true
+		}
+		for _, f := range result.Findings {
+			if f.Severity == "error" && policy["error"] == "block_completed" {
+				return true
+			}
+		}
 	}
-	plan := buildValidationPlan(req, mainPack, artifacts)
-	results := buildValidationResults(mainPack, artifacts, status)
-	base.Artifacts = []any{}
-	for _, artifact := range artifacts {
-		base.Artifacts = append(base.Artifacts, map[string]any{
-			"name": artifact,
-			"kind": "review-report",
-		})
+	return false
+}
+
+func hasWarnFindings(results []model.ValidatorResult) bool {
+	for _, result := range results {
+		if result.Status == "warned" {
+			return true
+		}
+		for _, f := range result.Findings {
+			if f.Severity == "warn" {
+				return true
+			}
+		}
 	}
-	base.ValidationResults = []any{map[string]any{
-		"validation_plan":   plan,
-		"validator_results": results,
-	}}
-	base.Handoff = buildHandoff(mainPack, req.Task)
-	return base
+	return false
+}
+
+func deriveStatus(requestInvalid bool, routeMissing bool, contextInsufficient bool, handoff map[string]any, plan model.ValidationPlan, results []model.ValidatorResult) string {
+	if requestInvalid {
+		return "failed"
+	}
+	if routeMissing {
+		return "failed"
+	}
+	if hasBlockingFailure(plan.SeverityPolicy, results) {
+		return "failed"
+	}
+	if len(handoff) > 0 {
+		return "handoff"
+	}
+	if contextInsufficient {
+		return "partial"
+	}
+	if hasWarnFindings(results) && plan.SeverityPolicy["warn"] == "allow_partial" {
+		return "partial"
+	}
+	return "completed"
 }
 
 func mergeHints(primary, secondary []string) []string {
@@ -220,10 +177,17 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	if err != nil {
 		return model.ActivationResult{}, err
 	}
-	if req.RequestID == "" || req.Task == "" || req.BoundedContext == nil {
+
+	invalid := req.RequestID == "" || req.Task == "" || req.BoundedContext == nil
+	if invalid {
 		return model.ActivationResult{
-			Status:  "failed",
-			Summary: "invalid activation request",
+			RequestID:         req.RequestID,
+			Status:            "failed",
+			MainPack:          nil,
+			Artifacts:         []model.Artifact{},
+			ValidationResults: []model.ValidationEnvelope{},
+			Handoff:           nil,
+			Summary:           "invalid activation request",
 		}, nil
 	}
 
@@ -248,34 +212,85 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 
 	if len(routeResult.Candidates) == 0 {
 		if req.TargetDomain != nil {
-			result := activationResult(req, nil, "insufficient evidence for L1, fallback to L0 recommended", "partial")
-			return withExecutionPayload(result, req, "", "partial"), nil
+			return model.ActivationResult{
+				RequestID:         req.RequestID,
+				Status:            "partial",
+				MainPack:          nil,
+				Artifacts:         []model.Artifact{},
+				ValidationResults: []model.ValidationEnvelope{},
+				Handoff:           nil,
+				Summary:           "insufficient evidence for L1, fallback to L0 recommended",
+			}, nil
 		}
-		return activationResult(req, nil, "no route candidate", "failed"), nil
+		return model.ActivationResult{
+			RequestID:         req.RequestID,
+			Status:            "failed",
+			MainPack:          nil,
+			Artifacts:         []model.Artifact{},
+			ValidationResults: []model.ValidationEnvelope{},
+			Handoff:           nil,
+			Summary:           "no route candidate",
+		}, nil
 	}
 
 	mainNode := routeResult.Candidates[0].ID
-	bundle, err := query.BuildContextBundle(db, mainNode, true, false, false)
+	bundle, err := query.BuildContextBundle(db, mainNode, true, false, true)
 	if err != nil {
 		return model.ActivationResult{}, err
 	}
+
 	mainPack := query.PackForNode(mainNode)
 	if mainPack == "" {
 		mainPack = "wxt-manifest"
 	}
 
-	if len(req.BoundedContext.SelectedFiles) == 0 && len(req.BoundedContext.ConfigFragments) == 0 {
-		result := activationResult(req, mainPack, "bounded context missing required evidence", "partial")
-		return withExecutionPayload(result, req, mainPack, "partial"), nil
+	artifacts := []model.Artifact{}
+	if mainPack == "wxt-manifest" {
+		artifacts = append(artifacts, model.Artifact{Name: "manifest-review.md", Kind: "review-report"})
 	}
-	if strings.Contains(strings.ToLower(req.Task), "handoff") {
-		result := activationResult(req, mainPack, "handoff requested by task boundary", "handoff")
-		return withExecutionPayload(result, req, mainPack, "handoff"), nil
+
+	handoff := buildHandoff(mainPack, req.Task)
+	contextInsufficient := len(req.BoundedContext.SelectedFiles) == 0 && len(req.BoundedContext.ConfigFragments) == 0
+
+	plan := buildValidationPlan(req, mainPack, artifacts)
+	vInput := validator.ExecutionInput{
+		Task:      req.Task,
+		MainPack:  mainPack,
+		Artifacts: artifacts,
+		BoundedContext: validator.BoundedContextSnapshot{
+			SelectedFiles:   req.BoundedContext.SelectedFiles,
+			ConfigFragments: req.BoundedContext.ConfigFragments,
+			HostHints:       req.BoundedContext.HostHints,
+			BrowserHints:    req.BoundedContext.BrowserHints,
+			ContextHints:    req.ContextHints,
+		},
+		RequestedHandoff: len(handoff) > 0,
+		Handoff:          handoff,
 	}
-	if len(bundle.RecommendedArtifacts) > 0 || len(bundle.RecommendedValidators) > 0 {
-		result := activationResult(req, mainPack, "route to L1.wxt.manifest with required cross-cutting lines", "completed")
-		return withExecutionPayload(result, req, mainPack, "completed"), nil
+	validatorResults := validator.Run(plan, vInput)
+	status := deriveStatus(false, false, contextInsufficient, handoff, plan, validatorResults)
+
+	summary := "route to L1.wxt.manifest with required cross-cutting lines"
+	if contextInsufficient {
+		summary = "bounded context missing required evidence"
 	}
-	result := activationResult(req, mainPack, "route to L1.wxt.manifest with required cross-cutting lines", "completed")
-	return withExecutionPayload(result, req, mainPack, "completed"), nil
+	if len(handoff) > 0 {
+		summary = "handoff requested by task boundary"
+	}
+	if len(bundle.RecommendedValidators) == 0 && len(bundle.RecommendedArtifacts) == 0 {
+		summary = "route succeeded with minimal bundle"
+	}
+
+	return model.ActivationResult{
+		RequestID: req.RequestID,
+		Status:    status,
+		MainPack:  ptr(mainPack),
+		Artifacts: artifacts,
+		ValidationResults: []model.ValidationEnvelope{{
+			ValidationPlan:   plan,
+			ValidatorResults: validatorResults,
+		}},
+		Handoff: handoff,
+		Summary: summary,
+	}, nil
 }

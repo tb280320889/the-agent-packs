@@ -83,10 +83,7 @@ func TestM2ActivationHandoffCarriesCarryContext(t *testing.T) {
 	if result.Handoff == nil {
 		t.Fatalf("expected handoff payload")
 	}
-	h, ok := result.Handoff.(map[string]any)
-	if !ok {
-		t.Fatalf("handoff payload has unexpected type")
-	}
+	h := result.Handoff
 	if _, ok := h["carry_context"]; !ok {
 		t.Fatalf("handoff payload missing carry_context")
 	}
