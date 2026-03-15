@@ -20,7 +20,7 @@
 - `blueprint/` 节点作为最小闭包知识源。
 - `blueprint/schema.md` 的最薄索引目标。
 - `tools/*/README.md` 的接口与边界。
-- `tests/test_m1_minimal.py` 的最小回归基线。
+- `tests/m1_minimal_test.go` 的最小回归基线。
 
 ## 4. 下一位 agent 必须先做什么
 - 先 claim：后续 M1 子任务 bead

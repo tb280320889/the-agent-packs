@@ -2,6 +2,11 @@
 
 本目录定义 M1 最薄 activation entry 的职责边界。
 
+## 运行方式（Go 模式B）
+- 本能力由统一二进制 `agent-pack-mcp` 提供。
+- 触发命令：`go run ./cmd/agent-pack-mcp activate --db blueprint/index/blueprint.db --request fixtures/activation-request.sample.json`
+- 推荐发布后改用预编译二进制 `agent-pack-mcp activate ...`。
+
 ## 最薄职责
 1. 接收 Activation Request
 2. 解析 task/target_pack/target_domain/bounded_context

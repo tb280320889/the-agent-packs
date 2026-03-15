@@ -39,10 +39,11 @@
   - `tools/compiler/README.md`
   - `tools/query-mcp/README.md`
   - `tools/activation-entry/README.md`
-  - `tools/compiler/compiler.py`
-  - `tools/query-mcp/query_mcp.py`
-  - `tools/activation-entry/activation_entry.py`
-  - `tests/test_m1_minimal.py`
+  - `cmd/agent-pack-mcp/main.go`
+  - `internal/compiler/compiler.go`
+  - `internal/query/query.go`
+  - `internal/activation/activation.go`
+  - `tests/m1_minimal_test.go`
   - `fixtures/README.md`
   - `fixtures/activation-request.sample.json`
   - `fixtures/context-bundle.sample.json`
@@ -59,5 +60,5 @@
 
 ## 7. 下一步建议
 - 建议下一个 bead：进入 M2（首个完整 workflow package：wxt-manifest）
-- 建议先执行的命令：`python -m unittest tests/test_m1_minimal.py`
+- 建议先执行的命令：`go test ./...`
 - 建议先阅读的文档：`docs/30-M2_首个完整Pack_wxt_manifest_开发指导.md`

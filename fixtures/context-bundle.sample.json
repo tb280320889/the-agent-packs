@@ -1,25 +1,26 @@
 {
   "main": {
     "id": "L1.wxt.manifest",
-    "summary": "Review WXT manifest generation rules, browser overrides, permissions, and store-facing risks."
+    "title": "WXT Manifest",
+    "summary": "Review WXT manifest generation rules, browser overrides, permissions, and store-facing risks.",
+    "level": "L1"
   },
   "required": [
     {
       "id": "L1.security.permissions",
-      "summary": "Assess permission scope, minimize sensitive capabilities, and surface security risks for store review."
+      "title": "Permissions Review",
+      "summary": "Assess permission scope, minimize sensitive capabilities, and surface security risks for store review.",
+      "level": "L1"
     },
     {
       "id": "L1.release.store-review",
-      "summary": "Prepare browser extension submissions by aligning manifest, permissions, and policy checks."
+      "title": "Store Review",
+      "summary": "Prepare browser extension submissions by aligning manifest, permissions, and policy checks.",
+      "level": "L1"
     }
   ],
   "execution_children": [],
-  "deferred": [
-    {
-      "id": "L3.wxt.manifest.edge-cases",
-      "summary": "Capture edge cases for WXT manifest handling across browsers and store rules."
-    }
-  ],
+  "deferred": [],
   "recommended_validators": [],
   "recommended_artifacts": []
 }

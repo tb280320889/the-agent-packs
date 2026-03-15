@@ -12,3 +12,7 @@ venv/
 
 # M1 local build artifacts
 blueprint/index/
+
+# Go local build outputs
+bin/
+dist/

@@ -2,6 +2,15 @@
 
 本目录定义 M1 最薄 Query MCP 的接口与职责边界。
 
+## 运行方式（Go 模式B）
+- 本能力由统一二进制 `agent-pack-mcp` 提供。
+- CLI 子命令：
+  - `go run ./cmd/agent-pack-mcp route_query ...`
+  - `go run ./cmd/agent-pack-mcp read_node ...`
+  - `go run ./cmd/agent-pack-mcp build_context_bundle ...`
+  - `go run ./cmd/agent-pack-mcp expand_node ...`
+- MCP server（stdio）：`go run ./cmd/agent-pack-mcp mcp --db blueprint/index/blueprint.db`
+
 ## 固定接口
 
 ### Resources
@@ -15,8 +24,8 @@
 - `expand_node`
 - `read_node`
 - `build_context_bundle`
+- `rebuild_index`
 - `validate_blueprint_graph`（二阶段）
-- `rebuild_index`（二阶段）
 
 ### Prompts
 - `route-task`
