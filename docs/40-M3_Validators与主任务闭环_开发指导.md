@@ -81,6 +81,37 @@ M3 负责把 **validation plan -> validators -> activation result** 与固定主
 - 当前冻结点
 - 仍可允许扩展的面
 
+## M3 冻结对象清单（交付后不得随意改形）
+1. `Validation Plan` 为运行前声明对象，固定最小字段：
+   - `plan_id`
+   - `request_id`
+   - `main_pack`
+   - `validators`
+   - `artifacts_under_validation`
+   - `severity_policy`
+   - `plan_reason`
+2. `Validator Result` 为单 validator 结构化输出，固定最小字段：
+   - `validator_name`
+   - `status`（`passed` / `warned` / `failed` / `skipped`）
+   - `findings`
+   - `repair_suggestions`
+   - `validated_artifacts`
+3. `Activation Result` 顶层结果容器固定字段：
+   - `request_id`
+   - `status`（`completed` / `partial` / `handoff` / `failed`）
+   - `main_pack`
+   - `artifacts`
+   - `validation_results`
+   - `handoff`
+   - `summary`
+4. M3 固定 validator 列表：
+   - `validator-core-output`
+   - `validator-domain-wxt-manifest`
+5. 状态裁决优先级冻结为：
+   - `failed > handoff > partial > completed`
+6. 固定主任务冻结为：
+   - `review WXT manifest permissions for browser store submission`
+
 ## 本里程碑绝对不要做的事
 - 重改 M0/M1/M2 已冻结 envelope
 - 先造很多 validator，再补 validation plan

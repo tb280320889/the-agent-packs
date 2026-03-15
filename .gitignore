@@ -2,3 +2,17 @@
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# M1 local build artifacts
+blueprint/index/
+
+# Go local build outputs
+bin/
+dist/

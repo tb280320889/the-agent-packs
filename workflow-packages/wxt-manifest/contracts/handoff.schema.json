@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "wxt-manifest handoff",
+  "type": ["object", "null"],
+  "properties": {
+    "from_pack": { "type": "string" },
+    "to_packs": { "type": "array", "items": { "type": "string" } },
+    "reason": { "type": "string" },
+    "carry_context": { "type": "object" }
+  },
+  "required": ["from_pack", "to_packs", "reason", "carry_context"],
+  "additionalProperties": true
+}

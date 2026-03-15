@@ -20,8 +20,11 @@
 
 每个 workflow package 首期统一使用以下结构：
 
+包根目录统一放在：`workflow-packages/<package>/`
+
 ```text
-<package>/
+workflow-packages/
+└─ <package>/
 ├─ README.md
 ├─ package.yaml
 ├─ skill/

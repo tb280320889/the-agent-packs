@@ -1,0 +1,43 @@
+name: wxt-manifest
+kind: workflow-package
+domain: wxt
+subdomain: manifest
+layer: product-line
+version: 0.1.0
+goal: >
+  Review WXT manifest generation rules, browser-specific overrides,
+  permissions, host permissions, and store-facing risks.
+inputs:
+  - user_goal
+  - project_state
+  - host_environment
+  - available_tools
+  - extension_constraints
+depends_on:
+  - security-permissions
+  - release-store-review
+mcp:
+  tools:
+    - inspect_manifest_inputs
+    - compare_browser_overrides
+  resources:
+    - wxt_manifest_guidelines
+    - browser_store_constraints
+  prompts:
+    - manifest_review_prompt
+    - repair_prompt
+validators:
+  - validator-domain-wxt-manifest
+  - validator-core-output
+handoff:
+  incoming:
+    - global-handoff
+  outgoing:
+    - security-permissions-input
+    - release-store-review-input
+artifacts:
+  - manifest-review.md
+exit_criteria:
+  - permissions_reviewed
+  - store_risks_flagged
+  - validation_passed
