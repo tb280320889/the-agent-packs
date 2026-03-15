@@ -3,7 +3,7 @@
 ## 1. 当前阶段
 - 所属里程碑：M1
 - 关联 bead：the-agent-packs-nm4
-- 当前状态：in_progress
+- 当前状态：completed
 
 ## 2. 当前事实
 - 当前要解决的问题：把当前平铺式 route 抽象成“总编排 -> 主域编排 -> 横线挂接”的两段式候选裁剪模型，并给 M2 留下注册表字段需求。
@@ -39,7 +39,7 @@
   - `tests/m3_validation_closure_test.go`
 - 已产出文件：
   - `docs/改造计划v1/context-snapshots/2026-03-15-m1-layered-routing.md`
-- 已创建 bead：`the-agent-packs-nm4`
+- 已创建 bead：`the-agent-packs-nm4`（已完成并关闭）
 
 ## 6. 风险与阻塞
 - 风险：若没有实现型 bead 继续承接，M1 仍可能停留在文档层设计，无法验证与现有 query 实现的映射精度。
@@ -49,6 +49,6 @@
 - 是否需要 breaking 评估：否（当前仍是结构设计与交接补强，不改正式顶层协议）。
 
 ## 7. 下一步建议
-- 建议下一个 bead：围绕 `internal/query/query.go` 与 Blueprint/frontmatter/schema 设计“实现前差异清单”或“分层 route 实现草案” bead。
+- 建议下一个 bead：v1 M2 package 注册表与命名空间治理 bead。
 - 建议先阅读的文档：`docs/改造计划v1/30-M2_package注册表与命名空间治理_开发指导.md`、`docs/改造计划v1/31-M2_上下文_命名规则_注册表字段与冲突裁决.md`。
 - 建议先验证的命令：`go test ./...`、`bd show the-agent-packs-nm4 --json`。

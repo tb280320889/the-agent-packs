@@ -10,9 +10,9 @@
 
 ## 项目定位
 
-本仓库当前是 **Agent Pack 首期实现的文档与协作规范仓库**。
+本仓库当前是 **Agent Pack 改造计划 v1 的文档与协作规范仓库**。
 
-- 当前主目标不是堆功能，而是把 `M0 -> M1 -> M2 -> M3 -> M4` 这条里程碑链做成可被多个 agent 接力执行的稳定开发系统。
+- 当前主目标不是堆功能，而是把改造计划 v1 的 `M0 -> M1 -> M2 -> M3 -> M4` 这条里程碑链做成可被多个 agent 接力执行的稳定开发系统。
 - 当前第一条固定领域线是 `WXT`，首个完整样板 workflow package 是 `wxt-manifest`。
 - 所有开发都必须遵循 `activation-first`、`bounded-context`、`milestone-decoupled`、`progressive-disclosure` 原则，禁止越界扩张。
 
@@ -21,12 +21,12 @@
 任何 agent 进入仓库后，默认按下面顺序启动：
 
 1. 先阅读本文件 `AGENTS.md`
-2. 再阅读 `docs/00-总索引与使用说明.md`
-3. 再阅读 `docs/01-通用开发方法论与里程碑解耦规则.md`
-4. 再阅读 `docs/02-系统层总设计_渐进式披露与最小上下文包.md`
-5. 再阅读 `docs/03-领域树_operating_model_母版与首期实现映射.md`
-6. 再阅读 `docs/04-多Agent接力开发与bd协作规则.md`
-7. 再阅读 `docs/05-统一Handoff_ContextSnapshot_共享文档模板.md`
+2. 再阅读 `docs/改造计划v1/00-总索引与使用说明.md`
+3. 再阅读 `docs/改造计划v1/01-通用改造方法论与增量迁移规则.md`
+4. 再阅读 `docs/改造计划v1/02-目标系统模型_总编排_子编排与分层索引.md`
+5. 再阅读 `docs/改造计划v1/03-角色体系与协作模型.md`
+6. 再阅读 `docs/改造计划v1/04-多Agent接力开发与bd协作规则_改造版.md`
+7. 再阅读 `docs/改造计划v1/05-统一Handoff_ContextSnapshot_共享文档模板_改造版.md`
 8. 运行 `bd prime`
 9. 运行 `bd ready --json`
 10. 运行 `bd status --json`
@@ -34,25 +34,25 @@
 
 如果 issue 已明确属于某个里程碑，则继续阅读：
 
-- `M0`：`docs/10-M0_规则冻结与契约补齐_开发指导.md` + `docs/11-M0_上下文_系统定义与硬边界.md` + `docs/12-M0_上下文_协议契约与缺口补齐.md` + `docs/13-M0_上下文_四层系统闭合与Blueprint_Query_MCP.md`
-- `M1`：`docs/20-M1_Blueprint知识骨架与最薄入口_开发指导.md` + `docs/21-M1_上下文_Blueprint_命名_目录_frontmatter.md` + `docs/22-M1_上下文_Routing_Bundle_ActivationEntry.md` + `docs/23-M1_上下文_Compiler_SQLite_QueryMCP骨架.md`
-- `M2`：`docs/30-M2_首个完整Pack_wxt_manifest_开发指导.md` + `docs/31-M2_上下文_workflow_package标准模板与跨包边界.md` + `docs/32-M2_上下文_wxt_manifest_Pack规格_artifact_handoff.md`
-- `M3`：`docs/40-M3_Validators与主任务闭环_开发指导.md` + `docs/41-M3_上下文_ValidationPlan_ValidatorResult_ActivationResult.md` + `docs/42-M3_上下文_测试矩阵与固定主任务闭环.md`
-- `M4`：`docs/50-M4_Phase1冻结与扩域准入_开发指导.md` + `docs/51-M4_上下文_冻结策略_修改纪律_BreakingChange.md` + `docs/52-M4_上下文_第二领域线准入与可复用骨架.md`
+- `M0`：`docs/改造计划v1/10-M0_角色冻结与边界校正_开发指导.md` + `docs/改造计划v1/11-M0_上下文_角色模型_职责与非目标.md` + `docs/改造计划v1/12-M0_上下文_冻结面_兼容面与禁止事项.md`
+- `M1`：`docs/改造计划v1/20-M1_分层索引与总编排骨架_开发指导.md` + `docs/改造计划v1/21-M1_上下文_节点分类_作用域与可见性.md` + `docs/改造计划v1/22-M1_上下文_Routing分层化与候选集裁剪.md`
+- `M2`：`docs/改造计划v1/30-M2_package注册表与命名空间治理_开发指导.md` + `docs/改造计划v1/31-M2_上下文_命名规则_注册表字段与冲突裁决.md`
+- `M3`：`docs/改造计划v1/40-M3_文档吸收管道与知识资产化_开发指导.md` + `docs/改造计划v1/41-M3_上下文_外部资料纳入_语义映射与资产落位.md`
+- `M4`：`docs/改造计划v1/50-M4_迁移实施_兼容验证与准入演练_开发指导.md` + `docs/改造计划v1/51-M4_上下文_迁移步骤_回滚策略与验收清单.md`
 
 ## 文档阅读边界
 
-- 每个里程碑 agent 默认只读自己的最小阅读集，加上 `00/01/02/03/04/05` 六份共享文档。
+- 每个里程碑 agent 默认只读自己的最小阅读集，加上 `docs/改造计划v1/00~05` 六份共享文档。
 - 除非 issue 明确要求，不要回退到“全量总纲式阅读”。
 - 当前里程碑只能消费前一里程碑的固定交付物、冻结对象、风险清单与禁止事项。
-- `docs/02-系统层总设计_渐进式披露与最小上下文包.md` 是系统层母版，任何里程碑都不允许绕过。
-- `docs/03-领域树_operating_model_母版与首期实现映射.md` 保存长期 operating model，不代表当前就要全做。
-- `docs/04-多Agent接力开发与bd协作规则.md` 与 `docs/05-统一Handoff_ContextSnapshot_共享文档模板.md` 是共享协作层，不是可选材料。
+- `docs/改造计划v1/02-目标系统模型_总编排_子编排与分层索引.md` 是当前系统层母版，任何里程碑都不允许绕过。
+- `docs/改造计划v1/03-角色体系与协作模型.md` 保存长期协作骨架，不代表当前就要全做。
+- `docs/改造计划v1/04-多Agent接力开发与bd协作规则_改造版.md` 与 `docs/改造计划v1/05-统一Handoff_ContextSnapshot_共享文档模板_改造版.md` 是共享协作层，不是可选材料。
 - 如果发现前置交付物缺失，不要脑补，必须：记录 issue、标记阻塞、补 handoff 或 context snapshot。
 
 ## 系统层判断
 
-当前正式系统骨架固定为：
+当前系统骨架固定为：
 
 `Git truth layer -> Markdown + frontmatter -> SQLite index -> Blueprint Query MCP -> minimal context bundle -> workflow package -> validator -> activation result / handoff`
 
@@ -122,8 +122,8 @@ bd dolt push
 统一规则：
 
 - 任务状态放在 `bd`
-- 系统与里程碑约束放在 `docs/`
-- 阶段性交接使用 `docs/05-统一Handoff_ContextSnapshot_共享文档模板.md` 中的模板
+- 系统与里程碑约束放在 `docs/改造计划v1/`
+- 阶段性交接使用 `docs/改造计划v1/05-统一Handoff_ContextSnapshot_共享文档模板_改造版.md` 中的模板
 - 不允许把只存在于对话中的关键上下文当成“已共享上下文”
 
 ## 多-agent 工作流
