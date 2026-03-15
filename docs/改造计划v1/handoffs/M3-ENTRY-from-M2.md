@@ -2,7 +2,7 @@
 
 ## 1. 交接对象
 - 来源 bead：the-agent-packs-bsj / the-agent-packs-3eq
-- 下一 bead：待创建（M3 文档吸收管道与知识资产化）
+- 下一 bead：the-agent-packs-s91
 - 来源里程碑：M2
 - 目标角色：项目内部维护 agent / 文档型 agent / 迭代开发子 agent
 
