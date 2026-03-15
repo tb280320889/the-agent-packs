@@ -24,6 +24,9 @@ func TestM2RegistryLoadsAndValidates(t *testing.T) {
 	if entry.Category != "workflow" || entry.CanonicalBlueprintNode != "L1.wxt.manifest" {
 		t.Fatalf("unexpected entry: %+v", entry)
 	}
+	if len(entry.RequiredPacks) != 2 || entry.RequiredPacks[0] != "security-permissions" || entry.RequiredPacks[1] != "release-store-review" {
+		t.Fatalf("expected registry required packs from manifest, got %+v", entry.RequiredPacks)
+	}
 }
 
 func TestM2RegistryReservedBareNameRejected(t *testing.T) {

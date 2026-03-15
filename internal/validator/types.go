@@ -14,6 +14,7 @@ type ExecutionInput struct {
 	Task             string
 	MainPack         string
 	Artifacts        []model.Artifact
+	RequiredPacks    []string
 	BoundedContext   BoundedContextSnapshot
 	RequestedHandoff bool
 	Handoff          map[string]any

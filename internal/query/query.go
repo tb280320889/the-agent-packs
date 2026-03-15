@@ -18,6 +18,7 @@ import (
 
 type packProfile struct {
 	PackName              string
+	RequiredPacks         []string
 	RecommendedValidators []string
 	RecommendedArtifacts  []string
 }
@@ -53,6 +54,7 @@ func profileForNode(nodeID string) (packProfile, bool) {
 	}
 	return packProfile{
 		PackName:              entry.Name,
+		RequiredPacks:         append([]string{}, entry.RequiredPacks...),
 		RecommendedValidators: append([]string{}, entry.RecommendedValidators...),
 		RecommendedArtifacts:  append([]string{}, entry.RecommendedArtifacts...),
 	}, true
@@ -302,6 +304,18 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 						MustInclude: must,
 					}, nil
 				}
+				return model.RouteResult{
+					Candidates: []model.RouteCandidate{{
+						ID:              entry.CanonicalBlueprintNode,
+						Title:           entry.Name,
+						Summary:         entry.Category,
+						Score:           99.0,
+						Reason:          []string{"target_pack match", "registry fallback"},
+						VisibilityScope: entry.VisibilityScope,
+						ActivationMode:  entry.ActivationMode,
+					}},
+					MustInclude: []string{},
+				}, nil
 			}
 		}
 	}
@@ -387,15 +401,31 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 	must := []string{}
 	if len(selected) > 0 {
 		must, _ = fetchEdges(db, selected[0].ID, "required_with")
+		if profile, ok := profileForNode(selected[0].ID); ok {
+			reg, err := registry.Default()
+			if err == nil {
+				for _, packName := range profile.RequiredPacks {
+					if entry, found := registry.FindByName(reg, packName); found {
+						must = append(must, entry.CanonicalBlueprintNode)
+					}
+				}
+			}
+		}
 		seen := map[string]bool{}
+		merged := make([]string, 0, len(must)+len(attachIDs))
 		for _, id := range must {
-			seen[id] = true
+			if !seen[id] {
+				seen[id] = true
+				merged = append(merged, id)
+			}
 		}
 		for _, id := range attachIDs {
 			if !seen[id] {
-				must = append(must, id)
+				seen[id] = true
+				merged = append(merged, id)
 			}
 		}
+		must = merged
 	}
 
 	return model.RouteResult{Candidates: selected, MustInclude: must}, nil
@@ -422,6 +452,7 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		Required:              []model.NodeSummary{},
 		ExecutionChildren:     []model.NodeSummary{},
 		Deferred:              []model.NodeSummary{},
+		RequiredPacks:         []string{},
 		RecommendedValidators: []string{},
 		RecommendedArtifacts:  []string{},
 	}
@@ -435,6 +466,7 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 	}
 	bundle.Main = main
 	if profile, ok := profileForNode(mainNode); ok {
+		bundle.RequiredPacks = append(bundle.RequiredPacks, profile.RequiredPacks...)
 		bundle.RecommendedValidators = append(bundle.RecommendedValidators, profile.RecommendedValidators...)
 		bundle.RecommendedArtifacts = append(bundle.RecommendedArtifacts, profile.RecommendedArtifacts...)
 	}

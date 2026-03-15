@@ -63,6 +63,7 @@ type ContextBundle struct {
 	Required              []NodeSummary `json:"required"`
 	ExecutionChildren     []NodeSummary `json:"execution_children"`
 	Deferred              []NodeSummary `json:"deferred"`
+	RequiredPacks         []string      `json:"required_packs"`
 	RecommendedValidators []string      `json:"recommended_validators"`
 	RecommendedArtifacts  []string      `json:"recommended_artifacts"`
 }

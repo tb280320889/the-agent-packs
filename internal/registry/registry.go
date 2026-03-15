@@ -32,10 +32,13 @@ type Registry struct {
 }
 
 type packageManifest struct {
-	Name      string
-	Kind      string
-	Domain    string
-	Subdomain string
+	Name       string
+	Kind       string
+	Domain     string
+	Subdomain  string
+	DependsOn  []string
+	Validators []string
+	Artifacts  []string
 }
 
 var (
@@ -82,13 +85,18 @@ func Validate(reg Registry, packagesRoot string) error {
 		reserved[normalized] = true
 	}
 
-	names := map[string]bool{}
+	allNames := map[string]bool{}
+	for _, entry := range reg.Packages {
+		allNames[entry.Name] = true
+	}
+
+	seenNames := map[string]bool{}
 	aliases := map[string]string{}
 	for _, entry := range reg.Packages {
-		if err := validateEntry(entry, packagesRoot, reserved, names, aliases); err != nil {
+		if err := validateEntry(entry, packagesRoot, reserved, seenNames, allNames, aliases); err != nil {
 			return err
 		}
-		names[entry.Name] = true
+		seenNames[entry.Name] = true
 		for _, alias := range entry.Aliases {
 			aliases[alias] = entry.Name
 		}
@@ -114,14 +122,14 @@ func FindByNode(reg Registry, nodeID string) (PackageEntry, bool) {
 	return PackageEntry{}, false
 }
 
-func validateEntry(entry PackageEntry, packagesRoot string, reserved, names map[string]bool, aliases map[string]string) error {
+func validateEntry(entry PackageEntry, packagesRoot string, reserved, seenNames, allNames map[string]bool, aliases map[string]string) error {
 	if strings.TrimSpace(entry.Name) == "" {
 		return errors.New("package name cannot be empty")
 	}
 	if reserved[entry.Name] {
 		return fmt.Errorf("package name %q is reserved and cannot be registered directly", entry.Name)
 	}
-	if names[entry.Name] {
+	if seenNames[entry.Name] {
 		return fmt.Errorf("duplicate package name %q", entry.Name)
 	}
 	if strings.TrimSpace(entry.Kind) == "" || strings.TrimSpace(entry.Category) == "" {
@@ -143,7 +151,7 @@ func validateEntry(entry PackageEntry, packagesRoot string, reserved, names map[
 		if alias == entry.Name {
 			return fmt.Errorf("package %q alias must not equal canonical name", entry.Name)
 		}
-		if names[alias] {
+		if allNames[alias] {
 			return fmt.Errorf("package %q alias %q conflicts with canonical name", entry.Name, alias)
 		}
 		if owner, ok := aliases[alias]; ok {
@@ -166,6 +174,23 @@ func validateEntry(entry PackageEntry, packagesRoot string, reserved, names map[
 	}
 	if manifest.Subdomain != entry.Subdomain {
 		return fmt.Errorf("package %q manifest subdomain mismatch: %q", entry.Name, manifest.Subdomain)
+	}
+	if !sameStringSet(manifest.Validators, entry.RecommendedValidators) {
+		return fmt.Errorf("package %q manifest validators mismatch: manifest=%v registry=%v", entry.Name, manifest.Validators, entry.RecommendedValidators)
+	}
+	if !sameStringSet(manifest.Artifacts, entry.RecommendedArtifacts) {
+		return fmt.Errorf("package %q manifest artifacts mismatch: manifest=%v registry=%v", entry.Name, manifest.Artifacts, entry.RecommendedArtifacts)
+	}
+	if !sameStringSet(manifest.DependsOn, entry.RequiredPacks) {
+		return fmt.Errorf("package %q manifest depends_on mismatch: manifest=%v registry=%v", entry.Name, manifest.DependsOn, entry.RequiredPacks)
+	}
+	for _, dep := range entry.RequiredPacks {
+		if dep == entry.Name {
+			return fmt.Errorf("package %q must not require itself", entry.Name)
+		}
+		if !allNames[dep] {
+			return fmt.Errorf("package %q requires unknown pack %q", entry.Name, dep)
+		}
 	}
 	return nil
 }
@@ -217,9 +242,27 @@ func readPackageManifest(path string) (packageManifest, error) {
 		return packageManifest{}, err
 	}
 	manifest := packageManifest{}
+	currentListKey := ""
 	for _, line := range strings.Split(string(raw), "\n") {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "-") {
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if strings.HasPrefix(trimmed, "- ") {
+			if currentListKey == "" {
+				continue
+			}
+			value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+			value = strings.Trim(value, `"'`)
+			switch currentListKey {
+			case "depends_on":
+				manifest.DependsOn = append(manifest.DependsOn, value)
+			case "validators":
+				manifest.Validators = append(manifest.Validators, value)
+			case "artifacts":
+				manifest.Artifacts = append(manifest.Artifacts, value)
+			}
 			continue
 		}
 		parts := strings.SplitN(trimmed, ":", 2)
@@ -228,6 +271,18 @@ func readPackageManifest(path string) (packageManifest, error) {
 		}
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
+		if indent == 0 && value == "" {
+			switch key {
+			case "depends_on", "validators", "artifacts":
+				currentListKey = key
+			default:
+				currentListKey = ""
+			}
+			continue
+		}
+		if indent == 0 {
+			currentListKey = ""
+		}
 		value = strings.Trim(value, `"'`)
 		switch key {
 		case "name":
@@ -244,6 +299,25 @@ func readPackageManifest(path string) (packageManifest, error) {
 		return packageManifest{}, errors.New("package manifest must include name, kind, domain, subdomain")
 	}
 	return manifest, nil
+}
+
+func sameStringSet(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := map[string]int{}
+	for _, item := range left {
+		seen[item]++
+	}
+	for _, item := range right {
+		seen[item]--
+	}
+	for _, count := range seen {
+		if count != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func findProjectRoot() (string, error) {

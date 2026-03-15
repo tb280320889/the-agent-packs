@@ -48,8 +48,12 @@
         "permissions review"
       ],
       "reserved": false,
-      "recommended_validators": [],
-      "recommended_artifacts": [],
+      "recommended_validators": [
+        "validator-core-output"
+      ],
+      "recommended_artifacts": [
+        "permissions-review.md"
+      ],
       "required_packs": []
     },
     {
@@ -66,8 +70,12 @@
         "submission review"
       ],
       "reserved": false,
-      "recommended_validators": [],
-      "recommended_artifacts": [],
+      "recommended_validators": [
+        "validator-core-output"
+      ],
+      "recommended_artifacts": [
+        "store-review.md"
+      ],
       "required_packs": []
     }
   ]

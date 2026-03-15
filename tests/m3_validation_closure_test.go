@@ -181,4 +181,15 @@ func TestM3HandoffContainsCarryContext(t *testing.T) {
 	if _, ok := result.Handoff["carry_context"]; !ok {
 		t.Fatalf("expected carry_context in handoff")
 	}
+	toPacksRaw, ok := result.Handoff["to_packs"].([]string)
+	if !ok {
+		t.Fatalf("expected typed to_packs slice in handoff, got %#v", result.Handoff["to_packs"])
+	}
+	if len(toPacksRaw) != 2 || toPacksRaw[0] != "security-permissions" || toPacksRaw[1] != "release-store-review" {
+		t.Fatalf("unexpected to_packs in handoff: %+v", toPacksRaw)
+	}
+	plan := result.ValidationResults[0].ValidationPlan
+	if len(plan.Validators) != 2 {
+		t.Fatalf("expected registry-aligned validators, got %+v", plan.Validators)
+	}
 }

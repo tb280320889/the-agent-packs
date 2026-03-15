@@ -50,17 +50,19 @@ func ptr(s string) *string {
 }
 
 func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.Artifact) model.ValidationPlan {
-	validators := []model.ValidatorPlan{{
-		Name:   "validator-core-output",
-		Scope:  "artifact",
-		Reason: "All output artifacts must satisfy envelope completeness.",
-	}}
+	bundleValidators := []string{"validator-core-output"}
 	if mainPack == "wxt-manifest" {
-		validators = append(validators, model.ValidatorPlan{
-			Name:   "validator-domain-wxt-manifest",
-			Scope:  "domain",
-			Reason: "Manifest review must cover permission and store-facing risks.",
-		})
+		bundleValidators = append(bundleValidators, "validator-domain-wxt-manifest")
+	}
+	validators := make([]model.ValidatorPlan, 0, len(bundleValidators))
+	for _, name := range bundleValidators {
+		scope := "artifact"
+		reason := "All output artifacts must satisfy envelope completeness."
+		if name == "validator-domain-wxt-manifest" {
+			scope = "domain"
+			reason = "Manifest review must cover permission and store-facing risks."
+		}
+		validators = append(validators, model.ValidatorPlan{Name: name, Scope: scope, Reason: reason})
 	}
 	artifactNames := make([]string, 0, len(artifacts))
 	for _, artifact := range artifacts {
@@ -244,8 +246,11 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		mainPack = "wxt-manifest"
 	}
 
-	artifacts := []model.Artifact{}
-	if mainPack == "wxt-manifest" {
+	artifacts := make([]model.Artifact, 0, len(bundle.RecommendedArtifacts))
+	for _, artifactName := range bundle.RecommendedArtifacts {
+		artifacts = append(artifacts, model.Artifact{Name: artifactName, Kind: inferArtifactKind(artifactName)})
+	}
+	if len(artifacts) == 0 && mainPack == "wxt-manifest" {
 		artifacts = append(artifacts, model.Artifact{Name: "manifest-review.md", Kind: "review-report"})
 	}
 
@@ -254,9 +259,10 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 
 	plan := buildValidationPlan(req, mainPack, artifacts)
 	vInput := validator.ExecutionInput{
-		Task:      req.Task,
-		MainPack:  mainPack,
-		Artifacts: artifacts,
+		Task:          req.Task,
+		MainPack:      mainPack,
+		Artifacts:     artifacts,
+		RequiredPacks: append([]string{}, bundle.RequiredPacks...),
 		BoundedContext: validator.BoundedContextSnapshot{
 			SelectedFiles:   req.BoundedContext.SelectedFiles,
 			ConfigFragments: req.BoundedContext.ConfigFragments,
@@ -293,4 +299,11 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		Handoff: handoff,
 		Summary: summary,
 	}, nil
+}
+
+func inferArtifactKind(name string) string {
+	if strings.HasSuffix(strings.ToLower(name), ".md") {
+		return "review-report"
+	}
+	return "artifact"
 }

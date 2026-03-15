@@ -203,6 +203,9 @@ func TestRouteDomainCompetitionExcludesAttachOnlyCapability(t *testing.T) {
 	if !foundSecurity || !foundRelease {
 		t.Fatalf("expected attach-only capabilities in must_include, got %+v", result.MustInclude)
 	}
+	if len(result.MustInclude) != 2 {
+		t.Fatalf("expected deduplicated must_include entries, got %+v", result.MustInclude)
+	}
 }
 
 func TestRouteAntiTriggerExclusion(t *testing.T) {

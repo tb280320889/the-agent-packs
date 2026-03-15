@@ -25,6 +25,9 @@ func TestM2BundleHasRecommendedValidatorsAndArtifacts(t *testing.T) {
 	if len(bundle.RecommendedArtifacts) != 1 || bundle.RecommendedArtifacts[0] != "manifest-review.md" {
 		t.Fatalf("unexpected recommended artifacts: %v", bundle.RecommendedArtifacts)
 	}
+	if len(bundle.RequiredPacks) != 2 || bundle.RequiredPacks[0] != "security-permissions" || bundle.RequiredPacks[1] != "release-store-review" {
+		t.Fatalf("unexpected required packs: %v", bundle.RequiredPacks)
+	}
 }
 
 func TestM2ActivationCompletedCarriesValidationPayload(t *testing.T) {
