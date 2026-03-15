@@ -170,3 +170,29 @@ M1 可以很薄，但不能薄到以下四点缺任意一个：
 - agent 的固定使用顺序
 
 这些对象如果在 M1 里一边实现一边改，就会导致系统层母版再次松动。
+
+---
+
+## 七、冻结清单（可直接引用）
+
+### 1. MCP surface 名称
+- Blueprint Query MCP
+
+### 2. Resource URI 语义
+- `blueprint://node/{id}`: 节点摘要或正文
+- `blueprint://children/{id}`: children 列表
+- `blueprint://required/{id}`: required_with 列表
+- `blueprint://bundle/{bundle_id}`: 已构建的最小上下文包
+
+### 3. Tool 名称与职责边界
+- `route_query`: 只做 L0/L1 路由
+- `expand_node`: 受限展开关系
+- `read_node`: 读指定节点摘要或正文
+- `build_context_bundle`: 产出 main/required/execution_children/deferred
+- `validate_blueprint_graph`: 校验图谱完整性（第二阶段）
+- `rebuild_index`: 重建 SQLite 索引（第二阶段）
+
+### 4. Prompt 名称
+- `route-task`
+- `expand-subdomain`
+- `debug-validator-failure`
