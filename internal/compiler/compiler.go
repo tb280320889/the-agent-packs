@@ -471,48 +471,6 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 	return nodes, metas, edges, errs, nil
 }
 
-func writeIndex(dbPath string, nodes []model.Node, metas []model.NodeMeta, edges []model.Edge) error {
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		return err
-	}
-	if _, err := os.Stat(dbPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-
-	tmpPath := dbPath + ".tmp"
-	backupPath := dbPath + ".bak"
-
-	_ = os.Remove(tmpPath)
-	if err := writeIndexToFile(tmpPath, nodes, metas, edges); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	backupCreated := false
-	if _, err := os.Stat(dbPath); err == nil {
-		_ = os.Remove(backupPath)
-		if err := os.Rename(dbPath, backupPath); err != nil {
-			_ = os.Remove(tmpPath)
-			return err
-		}
-		backupCreated = true
-	}
-
-	if err := os.Rename(tmpPath, dbPath); err != nil {
-		if backupCreated {
-			_ = os.Rename(backupPath, dbPath)
-		}
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	if backupCreated {
-		_ = os.Remove(backupPath)
-	}
-
-	return nil
-}
-
 func writeIndexToFile(dbPath string, nodes []model.Node, metas []model.NodeMeta, edges []model.Edge) error {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		return err
@@ -626,10 +584,6 @@ func Compile(rootDir, dbPath, reportDir string) (CompileResult, error) {
 	nodes, metas, edges, errs, err := validateAndCollect(rootDir)
 	if err != nil {
 		compileErr := model.CompilerError{Phase: string(PhaseParse), Path: rootDir, Code: "load_blueprint", Message: err.Error()}
-		return CompileResult{Errors: append(errs, compileErr)}, err
-	}
-	if err := writeIndex(dbPath, nodes, metas, edges); err != nil {
-		compileErr := model.CompilerError{Phase: string(PhaseIndex), Path: dbPath, Code: "index_write", Message: err.Error()}
 		return CompileResult{Errors: append(errs, compileErr)}, err
 	}
 	tmpPath := dbPath + ".tmp"

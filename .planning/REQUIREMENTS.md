@@ -16,10 +16,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Routing Governance
 
-- [ ] **ROUT-01**: Maintainer can enforce candidate-space-first routing (scope/mode filter before scoring)
-- [ ] **ROUT-02**: Maintainer can guarantee capability is attach-only after primary domain selection
-- [ ] **ROUT-03**: Maintainer can explain why main domain/main package/capabilities were selected
-- [ ] **ROUT-04**: Maintainer can return explicit error/partial when no canonical registry mapping exists (no silent fallback)
+- [x] **ROUT-01**: Maintainer can enforce candidate-space-first routing (scope/mode filter before scoring)
+- [x] **ROUT-02**: Maintainer can guarantee capability is attach-only after primary domain selection
+- [x] **ROUT-03**: Maintainer can explain why main domain/main package/capabilities were selected
+- [x] **ROUT-04**: Maintainer can return explicit error/partial when no canonical registry mapping exists (no silent fallback)
 
 ### Context Delivery Contract
 
@@ -70,10 +70,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PARS-02 | Phase 1 | Complete |
 | INDX-01 | Phase 1 | Complete |
 | INDX-02 | Phase 1 | Complete |
-| ROUT-01 | Phase 2 | Pending |
-| ROUT-02 | Phase 2 | Pending |
-| ROUT-03 | Phase 2 | Pending |
-| ROUT-04 | Phase 2 | Pending |
+| ROUT-01 | Phase 2 | Complete |
+| ROUT-02 | Phase 2 | Complete |
+| ROUT-03 | Phase 2 | Complete |
+| ROUT-04 | Phase 2 | Complete |
 | CONT-01 | Phase 3 | Pending |
 | CONT-02 | Phase 3 | Pending |
 | CONT-03 | Phase 3 | Pending |
