@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 - 所属里程碑：M2
-- 关联 bead：the-agent-packs-bsj
+- 关联 GSD 任务项：the-agent-packs-bsj
 - 当前状态：completed
 
 ## 2. 当前事实
@@ -35,7 +35,7 @@
   - `workflow-packages/release-store-review/README.md`
   - `internal/registry/registry.go`
   - `tests/m2_registry_test.go`
-- 已创建 bead：`the-agent-packs-bsj`
+- 已创建 GSD 任务项：`the-agent-packs-bsj`
 
 ## 6. 风险与阻塞
 - 风险：若 M3 在吸收外部资料时绕过注册表直接生成新包或游离资产，会重新引入命名与归属漂移。
@@ -45,6 +45,6 @@
 - 是否需要 breaking 评估：否（当前仍为结构层规则冻结，不改顶层协议）。
 
 ## 7. 下一步建议
-- 建议下一个 bead：M3 文档吸收管道与知识资产化 bead。
+- 建议下一个 GSD 任务项：M3 文档吸收管道与知识资产化任务项。
 - 建议先阅读的文档：`docs/改造计划v1/40-M3_文档吸收管道与知识资产化_开发指导.md`、`docs/改造计划v1/41-M3_上下文_外部资料纳入_语义映射与资产落位.md`、`docs/改造计划v1/31-M2_上下文_命名规则_注册表字段与冲突裁决.md`。
-- 建议先验证的命令：`go test ./...`、`bd show the-agent-packs-bsj --json`。
+- 建议先验证的命令：`go test ./...`、确认 GSD 任务记录状态。

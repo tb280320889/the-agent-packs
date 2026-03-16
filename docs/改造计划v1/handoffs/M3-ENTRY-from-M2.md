@@ -1,8 +1,8 @@
 # Handoff: M3 入口（承接 M2 注册表与命名空间治理）
 
 ## 1. 交接对象
-- 来源 bead：the-agent-packs-bsj / the-agent-packs-3eq
-- 下一 bead：the-agent-packs-s91
+- 来源 GSD 任务项：the-agent-packs-bsj / the-agent-packs-3eq
+- 下一 GSD 任务项：the-agent-packs-s91
 - 来源里程碑：M2
 - 目标角色：项目内部维护 agent / 文档型 agent / 迭代开发子 agent
 
@@ -21,7 +21,7 @@
 - 注册表真相源与实现：`workflow-packages/registry.json`、`internal/registry/registry.go`
 
 ## 4. 下一位 agent 必须先做什么
-- 先 claim：创建并认领 M3 bead。
+- 先在 GSD 任务记录中认领任务项：创建并认领 M3 任务项。
 - 先阅读：`docs/改造计划v1/40-M3_文档吸收管道与知识资产化_开发指导.md`、`docs/改造计划v1/41-M3_上下文_外部资料纳入_语义映射与资产落位.md`、`docs/改造计划v1/31-M2_上下文_命名规则_注册表字段与冲突裁决.md`。
 - 先验证：`go test ./...`。
 

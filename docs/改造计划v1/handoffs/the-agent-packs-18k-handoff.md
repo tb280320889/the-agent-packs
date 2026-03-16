@@ -1,8 +1,8 @@
 # Handoff: 改造计划 v1 M6 运行验证与 V1 收口
 
 ## 1. 交接对象
-- 来源 bead：the-agent-packs-18k
-- 下一 bead：待新建
+- 来源 GSD 任务项：the-agent-packs-18k
+- 下一 GSD 任务项：待新建
 - 来源里程碑：M6
 - 目标角色：项目内部维护 agent / 迭代开发子 agent / Verifier
 
@@ -20,18 +20,18 @@
 - 已补齐测试：`tests/m2_registry_test.go`、`tests/m2_wxt_manifest_test.go`、`tests/m3_validation_closure_test.go`
 
 ## 4. 下一位 agent 必须先做什么
-- 先确认是否已新建后续 bead；M6 已收口，不应继续混写。
+- 先确认是否已新建后续 GSD 任务项；M6 已收口，不应继续混写。
 - 先阅读：`docs/改造计划v1/72-M6_验收结果与V1收口结论.md`
 - 先验证：`go test ./...`
 
 ## 5. 不要做什么
 - 不要把“继续扩域开发”伪装成 M6 的未完成尾巴。
 - 不要重新引入按 pack 名硬编码 validator / handoff 的逻辑分支。
-- 不要在无 bead、snapshot、handoff 的情况下继续宣称新增领域线已经准入。
+- 不要在无 GSD 任务项、snapshot、handoff 的情况下继续宣称新增领域线已经准入。
 
 ## 6. 风险与未决项
 - v1 已完成，但真实第二主域业务样板尚未在仓库落地；这不是 M6 阻塞项，而是后续 roadmap 项。
 - 后续若新增新的 domain validator，必须继续保持注册表与 bundle 驱动，避免逻辑漂移。
 
 ## 7. 推荐下一动作
-- 为“真实第二主域样板接入”或“v1 后续扩域 roadmap”新建 bead，并在 v1 已冻结边界内推进。
+- 为“真实第二主域样板接入”或“v1 后续扩域 roadmap”新建 GSD 任务项，并在 v1 已冻结边界内推进。

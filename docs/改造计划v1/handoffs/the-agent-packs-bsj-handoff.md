@@ -1,8 +1,8 @@
 # Handoff: 改造计划 v1 M2 package 注册表与命名空间治理
 
 ## 1. 交接对象
-- 来源 bead：the-agent-packs-bsj
-- 下一 bead：待创建（建议 M2 实现层注册表准入 bead）
+- 来源 GSD 任务项：the-agent-packs-bsj
+- 下一 GSD 任务项：待创建（建议 M2 实现层注册表准入任务项）
 - 来源里程碑：M2
 - 目标角色：项目内部维护 agent / 迭代开发子 agent / Verifier
 
@@ -24,7 +24,7 @@
 - 阶段事实与风险：`docs/改造计划v1/context-snapshots/2026-03-15-m2-package-registry.md`
 
 ## 4. 下一位 agent 必须先做什么
-- 先 claim：新建并认领 M3 bead。
+- 先在 GSD 任务记录中认领任务项：新建并认领 M3 任务项。
 - 先阅读：`docs/改造计划v1/40-M3_文档吸收管道与知识资产化_开发指导.md`、`docs/改造计划v1/41-M3_上下文_外部资料纳入_语义映射与资产落位.md`、`docs/改造计划v1/30-M2_package注册表与命名空间治理_开发指导.md`、`docs/改造计划v1/31-M2_上下文_命名规则_注册表字段与冲突裁决.md`。
 - 先验证：`go test ./...`。
 

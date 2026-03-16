@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 - 所属里程碑：M3
-- 关联 bead：the-agent-packs-s91
+- 关联 GSD 任务项：the-agent-packs-s91
 - 当前状态：completed
 
 ## 2. 当前事实
@@ -28,7 +28,7 @@
 - 已产出文件：
   - `docs/改造计划v1/context-snapshots/2026-03-15-m3-knowledge-ingestion.md`
   - `docs/改造计划v1/handoffs/the-agent-packs-s91-handoff.md`
-- 已创建 bead：`the-agent-packs-s91`
+- 已创建 GSD 任务项：`the-agent-packs-s91`
 
 ## 6. 风险与阻塞
 - 风险：若后续执行层只保留流程名称，不把候选元数据与审查闸口做成硬性准入点，M3 仍可能退化为“资料堆放规范”。
@@ -38,6 +38,6 @@
 - 是否需要 breaking 评估：否（当前为治理层规则冻结，不改顶层协议）。
 
 ## 7. 下一步建议
-- 建议下一个 bead：M4 迁移实施、兼容验证与准入演练 bead。
+- 建议下一个 GSD 任务项：M4 迁移实施、兼容验证与准入演练任务项。
 - 建议先阅读的文档：`docs/改造计划v1/50-M4_迁移实施_兼容验证与准入演练_开发指导.md`、`docs/改造计划v1/51-M4_上下文_迁移步骤_回滚策略与验收清单.md`、`docs/改造计划v1/40-M3_文档吸收管道与知识资产化_开发指导.md`。
-- 建议先验证的命令：`go test ./...`、`bd show the-agent-packs-s91 --json`。
+- 建议先验证的命令：`go test ./...`、确认 GSD 任务记录状态。

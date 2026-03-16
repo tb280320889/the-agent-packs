@@ -15,7 +15,7 @@
 
 ## 1. 当前阶段
 - 所属里程碑：M0 / M1 / M2 / M3 / M4
-- 关联 bead：<id>
+- 关联 GSD 任务项：<id>
 - 当前状态：open / in_progress / blocked / completed
 
 ## 2. 当前事实
@@ -34,7 +34,7 @@
 ## 5. 当前输出
 - 已产出文件：
 - 已更新文件：
-- 已创建 bead：
+- 已创建 GSD 任务项：
 
 ## 6. 风险与阻塞
 - 风险：
@@ -42,7 +42,7 @@
 - 是否需要 breaking 评估：是 / 否
 
 ## 7. 下一步建议
-- 建议下一个 bead：
+- 建议下一个 GSD 任务项：
 - 建议先阅读的文档：
 - 建议先验证的命令：
 ```
@@ -50,7 +50,7 @@
 ## 二、Handoff 模板
 
 建议文件名：
-- `docs/改造计划v1/handoffs/<bead-id>-handoff.md`
+- `docs/改造计划v1/handoffs/<task-id>-handoff.md`
 
 模板：
 
@@ -58,8 +58,8 @@
 # Handoff: <标题>
 
 ## 1. 交接对象
-- 来源 bead：<id>
-- 下一 bead：<id>
+- 来源 GSD 任务项：<id>
+- 下一 GSD 任务项：<id>
 - 来源里程碑：M0 / M1 / M2 / M3 / M4
 - 目标角色：项目内部维护 agent / 迭代开发子 agent / 文档型 agent / Verifier
 
@@ -70,7 +70,7 @@
 -
 
 ## 4. 下一位 agent 必须先做什么
-- 先 claim：
+- 先在 GSD 任务记录中认领任务项：
 - 先阅读：
 - 先验证：
 

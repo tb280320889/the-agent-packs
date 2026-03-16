@@ -1,8 +1,8 @@
 # Handoff: 改造计划 v1 M5 实现迁移执行与差异整改
 
 ## 1. 交接对象
-- 来源 bead：the-agent-packs-1lg
-- 下一 bead：the-agent-packs-18k
+- 来源 GSD 任务项：the-agent-packs-1lg
+- 下一 GSD 任务项：the-agent-packs-18k
 - 来源里程碑：M5
 - 目标角色：项目内部维护 agent / 迭代开发子 agent / Verifier
 
@@ -19,12 +19,12 @@
 - M5 收口快照：`docs/改造计划v1/context-snapshots/2026-03-15-m5-execution-alignment.md`
 - 已对齐实现：`workflow-packages/registry.json`、`internal/registry/registry.go`、`internal/query/query.go`、`internal/activation/activation.go`、`internal/validator/core_output.go`
 - 已补齐测试：`tests/m1_minimal_test.go`、`tests/m2_registry_test.go`、`tests/m2_wxt_manifest_test.go`、`tests/m3_validation_closure_test.go`
-- bead：`the-agent-packs-18k`
+- GSD 任务项：`the-agent-packs-18k`
 
 ## 4. 下一位 agent 必须先做什么
-- 先 claim：`bd update the-agent-packs-18k --status=in_progress --json`
+- 先在 GSD 任务记录中认领任务项：`the-agent-packs-18k`
 - 先阅读：`docs/改造计划v1/62-M5_整改结果与收口结论.md`、`docs/改造计划v1/70-M6_运行验证_第二领域线准入实施与持续治理_开发指导.md`、`docs/改造计划v1/71-M6_上下文_验证矩阵_准入执行与治理节奏.md`
-- 先验证：`go test ./...`、`bd show the-agent-packs-18k --json`
+- 先验证：`go test ./...`、确认 GSD 任务记录状态
 
 ## 5. 不要做什么
 - 不要重新打开 M5 已通过的 registry / route 对齐结论去承载 M6 的运行策略讨论。

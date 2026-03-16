@@ -1,8 +1,8 @@
 # Handoff: 改造计划 v1 M0 角色冻结与边界校正
 
 ## 1. 交接对象
-- 来源 bead：the-agent-packs-5oq
-- 下一 bead：the-agent-packs-nm4
+- 来源 GSD 任务项：the-agent-packs-5oq
+- 下一 GSD 任务项：the-agent-packs-nm4
 - 来源里程碑：M0
 - 目标角色：项目内部维护 agent / 迭代开发子 agent
 
@@ -19,7 +19,7 @@
 - 阶段事实与风险：`docs/改造计划v1/context-snapshots/2026-03-15-m0-role-freeze.md`
 
 ## 4. 下一位 agent 必须先做什么
-- 先 claim：`the-agent-packs-nm4` 或其后续实现型 bead。
+- 先在 GSD 任务记录中认领任务项：`the-agent-packs-nm4` 或其后续实现型任务项。
 - 先阅读：`docs/改造计划v1/10-M0_角色冻结与边界校正_开发指导.md`、`docs/改造计划v1/11-M0_上下文_角色模型_职责与非目标.md`、`docs/改造计划v1/12-M0_上下文_冻结面_兼容面与禁止事项.md`。
 - 先验证：`go test ./...`。
 
@@ -30,8 +30,8 @@
 
 ## 6. 风险与未决项
 - M0 已补齐，但 M1 文档若不显式承接 M0 冻结摘要，仍可能出现阅读顺序漂移。
-- 后续 bead 仍需继续保持 `M1 depends on M0` 的依赖纪律。
+- 后续任务项仍需继续保持 `M1 depends on M0` 的依赖纪律。
 
 ## 7. 推荐下一动作
 - 回到 `the-agent-packs-nm4`，按 M0 已冻结边界继续做 M1 的结构设计与实现前拆分。
-- 如需继续推进实现，优先新建“分层 route 实现前差异清单” bead，而不是直接改正式 query 实现。
+- 如需继续推进实现，优先新建“分层 route 实现前差异清单”任务项，而不是直接改正式 query 实现。

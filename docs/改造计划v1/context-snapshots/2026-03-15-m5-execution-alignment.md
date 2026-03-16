@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 - 所属里程碑：M5
-- 关联 bead：the-agent-packs-1lg
+- 关联 GSD 任务项：the-agent-packs-1lg
 - 当前状态：completed
 
 ## 2. 当前事实
@@ -37,7 +37,7 @@
 - 已产出文件：
   - `docs/改造计划v1/62-M5_整改结果与收口结论.md`
   - `docs/改造计划v1/context-snapshots/2026-03-15-m5-execution-alignment.md`
-- 已创建 bead：无。
+- 已创建 GSD 任务项：无。
 
 ## 6. 风险与阻塞
 - 风险：M6 若接入第二领域线，需要继续验证新领域是否同样提供 registry/manifest/asset 一致性，避免只在 WXT 样板线上成立。
@@ -46,6 +46,6 @@
 - 是否需要 breaking 评估：否。
 
 ## 7. 下一步建议
-- 建议下一个 bead：`the-agent-packs-18k`
+- 建议下一个 GSD 任务项：`the-agent-packs-18k`
 - 建议先阅读的文档：`docs/改造计划v1/62-M5_整改结果与收口结论.md`、`docs/改造计划v1/70-M6_运行验证_第二领域线准入实施与持续治理_开发指导.md`、`docs/改造计划v1/71-M6_上下文_验证矩阵_准入执行与治理节奏.md`
-- 建议先验证的命令：`go test ./...`、`bd show the-agent-packs-18k --json`
+- 建议先验证的命令：`go test ./...`、确认 GSD 任务记录状态

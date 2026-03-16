@@ -27,10 +27,9 @@
 5. 再阅读 `docs/改造计划v1/03-角色体系与协作模型.md`
 6. 再阅读 `docs/改造计划v1/04-多Agent接力开发与bd协作规则_改造版.md`
 7. 再阅读 `docs/改造计划v1/05-统一Handoff_ContextSnapshot_共享文档模板_改造版.md`
-8. 运行 `bd prime`
-9. 运行 `bd ready --json`
-10. 运行 `bd status --json`
-11. 找到本次要执行的 bead，先 `claim`，再按所属里程碑补读最小阅读集
+8. 读取 GSD 进度追踪记录（若存在 STATE / Snapshot / Handoff）
+9. 确认本次要执行的 GSD 任务项
+10. 按所属里程碑补读最小阅读集
 
 如果 issue 已明确属于某个里程碑，则继续阅读：
 
@@ -63,28 +62,9 @@
 - Agent 默认只消费最小上下文包，不自由搜全文文档
 - L3 是升级层，不是默认阅读层
 
-## Issue Tracking with bd
+## GSD 进度追踪与任务记录
 
-本项目使用 **bd (beads)** 作为唯一任务追踪系统。不要使用 markdown TODO、临时清单或外部任务系统替代。
-
-### 启动必跑命令
-
-```bash
-bd prime
-bd ready --json
-bd status --json
-```
-
-### 日常核心命令
-
-```bash
-bd show <id> --json
-bd update <id> --claim --json
-bd create "标题" --description "上下文" -t task -p 1 --json
-bd dep add <blocked> <blocking> --json
-bd close <id> --reason "Completed" --json
-bd dolt push
-```
+本项目使用 **GSD 进度追踪/文档系统** 作为唯一任务真相源。不要使用 markdown TODO、临时清单或外部任务系统替代。
 
 ### 任务设计规则
 
@@ -102,26 +82,26 @@ bd dolt push
 
 ### 多-agent 接力规则
 
-- 开工前先 `bd update <id> --claim --json`
-- 一个 agent 同一时刻只应主负责一个 bead
-- 发现新工作，不要口头留下，立即创建 bead 并建立依赖
-- 如果被外部条件阻塞，用 `bd gate` 表达等待条件
-- 如果并行分支需要避免合并打架，用 `bd merge-slot acquire` / `release`
-- 如果需要多工作目录并行开发，用 `bd worktree create <name>`
-- 关键决策、偏航原因、人工介入点可写入 `bd audit record`
-- 长时运行或多 agent 编排时，可用 `bd agent state` 与 `bd agent heartbeat` 标记状态
+- 开工前先在 GSD 任务记录中认领任务项并标记进行中
+- 一个 agent 同一时刻只应主负责一个 GSD 任务项
+- 发现新工作，不要口头留下，立即创建 GSD 任务项并建立依赖
+- 被外部条件阻塞时，在 GSD 任务记录中明确阻塞原因与解除条件
+- 并行分支需避免合并打架时，在 GSD 任务记录中声明并行工作范围
+- 需要多工作目录并行开发时，先在 GSD 任务记录中标注工作树策略
+- 关键决策、偏航原因、人工介入点要写入 GSD 任务记录
+- 长时运行或多 agent 编排时，保持 GSD 任务记录的阶段性更新
 
 ## 共享上下文系统
 
-本项目默认使用“**bd issue + Context Snapshot + Handoff**”三层共享上下文：
+本项目默认使用“**GSD 任务记录 + Context Snapshot + Handoff**”三层共享上下文：
 
-1. `bd issue`：记录任务归属、状态、依赖、阻塞
+1. `GSD 任务记录`：记录任务归属、状态、依赖、阻塞
 2. `Context Snapshot`：记录当前阶段事实、冻结对象、输入输出、未决项
 3. `Handoff`：记录从当前 agent 到下一个 agent 的可执行交接信息
 
 统一规则：
 
-- 任务状态放在 `bd`
+- 任务状态放在 GSD 任务记录
 - 系统与里程碑约束放在 `docs/改造计划v1/`
 - 阶段性交接使用 `docs/改造计划v1/05-统一Handoff_ContextSnapshot_共享文档模板_改造版.md` 中的模板
 - 不允许把只存在于对话中的关键上下文当成“已共享上下文”
@@ -130,14 +110,14 @@ bd dolt push
 
 推荐采用下面的接力模型：
 
-1. `Planner Agent`：拆 epic、建依赖、定义里程碑 bead
-2. `Executor Agent`：领取单个 bead，按最小阅读集实施
+1. `Planner Agent`：拆 epic、建依赖、定义里程碑 GSD 任务项
+2. `Executor Agent`：领取单个 GSD 任务项，按最小阅读集实施
 3. `Verifier Agent`：验证交付物、测试、schema、闭环状态
-4. `Handoff Agent`：补齐 snapshot、更新风险、关闭或转交 bead
+4. `Handoff Agent`：补齐 snapshot、更新风险、关闭或转交 GSD 任务项
 
 每次接力必须至少完成四件事：
 
-1. 更新 bead 状态
+1. 更新 GSD 任务状态
 2. 产出或更新 context snapshot
 3. 明确冻结对象与未决项
 4. 给下一个 agent 明确“可依赖什么 / 不要做什么”
@@ -146,7 +126,7 @@ bd dolt push
 
 每完成一个阶段性工作，至少要留下：
 
-- 对应 bead 的状态更新
+- 对应 GSD 任务项的状态更新
 - 一份简短中文 handoff
 - 一份可追溯的 Context Snapshot 或其更新
 - 明确的风险/阻塞说明
@@ -173,25 +153,24 @@ cp -rf source dest
 
 ## 会话结束前必须做的事
 
-1. 为剩余工作创建或更新 bead
+1. 为剩余工作创建或更新 GSD 任务项
 2. 运行必要验证：测试、lint、构建、文档校验
 3. 更新 handoff / context snapshot
-4. 关闭已完成 bead，或把 bead 状态改成真实状态
+4. 关闭已完成 GSD 任务项，或把任务状态改成真实状态
 5. 执行同步：
 
 ```bash
 git pull --rebase
-bd dolt push
 git push
 git status
 ```
 
-6. 确认没有“只存在本地、未交接、未入 issue”的上下文残留
+6. 确认没有“只存在本地、未交接、未入任务记录”的上下文残留
 
 ## 关键禁令
 
 - 禁止用英文输出替代中文说明
-- 禁止绕过 `bd` 私下记录任务
+- 禁止绕过 GSD 任务记录私下记录任务
 - 禁止跳过 claim 直接并行改同一工作单元
 - 禁止在无 handoff 的情况下把问题口头转交给下一个 agent
 - 禁止把未冻结对象当成稳定协议传播

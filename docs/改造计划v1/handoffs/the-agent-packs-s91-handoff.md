@@ -1,8 +1,8 @@
 # Handoff: 改造计划 v1 M3 文档吸收管道与知识资产化
 
 ## 1. 交接对象
-- 来源 bead：the-agent-packs-s91
-- 下一 bead：the-agent-packs-2ji
+- 来源 GSD 任务项：the-agent-packs-s91
+- 下一 GSD 任务项：the-agent-packs-2ji
 - 来源里程碑：M3
 - 目标角色：项目内部维护 agent / 文档型 agent / Verifier
 
@@ -20,7 +20,7 @@
 - M2 注册表实现：`internal/registry/registry.go`
 
 ## 4. 下一位 agent 必须先做什么
-- 先 claim：新建并认领 M4 bead。
+- 先在 GSD 任务记录中认领任务项：新建并认领 M4 任务项。
 - 先阅读：`docs/改造计划v1/50-M4_迁移实施_兼容验证与准入演练_开发指导.md`、`docs/改造计划v1/51-M4_上下文_迁移步骤_回滚策略与验收清单.md`、`docs/改造计划v1/40-M3_文档吸收管道与知识资产化_开发指导.md`、`docs/改造计划v1/41-M3_上下文_外部资料纳入_语义映射与资产落位.md`。
 - 先验证：`go test ./...`。
 
