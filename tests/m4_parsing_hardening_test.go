@@ -191,6 +191,45 @@ func TestM4FrontmatterStrict(t *testing.T) {
 	}
 }
 
+func TestM4FrontmatterYamlVariants(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "blueprint")
+	filePath := filepath.Join(root, "L1", "demo", "variants.md")
+	if err := writeBlueprintFixture(filePath, strings.Join([]string{
+		"---",
+		"id: L1.demo.variants",
+		"level: L1",
+		"domain: demo",
+		"subdomain: variants",
+		"capability: null",
+		"node_kind: workflow-entry",
+		"visibility_scope: domain-scoped",
+		"activation_mode: direct",
+		"title: 'Demo: Variants'",
+		"summary: \"Quoted summary\"",
+		"aliases: [\"alpha\", 'beta']",
+		"triggers: [manifest, \"permissions\"]",
+		"anti_triggers: []",
+		"required_with: []",
+		"may_include: []",
+		"children: []",
+		"entry_conditions: [entry_ok]",
+		"stop_conditions: [stop_ok]",
+		"---",
+		"body",
+	}, "\n")); err != nil {
+		t.Fatalf("write blueprint fixture failed: %v", err)
+	}
+
+	errList, err := compiler.Compile(root, filepath.Join(base, "index", "blueprint.db"), filepath.Join(base, "index"))
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+	if len(errList) != 0 {
+		t.Fatalf("expected no errors, got %+v", errList)
+	}
+}
+
 func writeRegistryFixture(path string, reg registry.Registry) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err

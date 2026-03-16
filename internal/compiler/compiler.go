@@ -1,18 +1,21 @@
 package compiler
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
 	_ "modernc.org/sqlite"
 
 	"the-agent-packs/internal/model"
@@ -39,6 +42,27 @@ var requiredKeys = []string{
 	"activation_mode",
 }
 
+type frontmatter struct {
+	ID              string   `yaml:"id"`
+	Level           string   `yaml:"level"`
+	Domain          string   `yaml:"domain"`
+	Subdomain       *string  `yaml:"subdomain"`
+	Capability      *string  `yaml:"capability"`
+	Title           string   `yaml:"title"`
+	Summary         string   `yaml:"summary"`
+	Aliases         []string `yaml:"aliases"`
+	Triggers        []string `yaml:"triggers"`
+	AntiTriggers    []string `yaml:"anti_triggers"`
+	RequiredWith    []string `yaml:"required_with"`
+	MayInclude      []string `yaml:"may_include"`
+	Children        []string `yaml:"children"`
+	EntryConditions []string `yaml:"entry_conditions"`
+	StopConditions  []string `yaml:"stop_conditions"`
+	NodeKind        string   `yaml:"node_kind"`
+	VisibilityScope string   `yaml:"visibility_scope"`
+	ActivationMode  string   `yaml:"activation_mode"`
+}
+
 func parseFrontmatter(text string) (map[string]any, string, error) {
 	lines := strings.Split(text, "\n")
 	if len(lines) == 0 || strings.TrimSpace(strings.TrimRight(lines[0], "\r")) != "---" {
@@ -56,39 +80,46 @@ func parseFrontmatter(text string) (map[string]any, string, error) {
 		return nil, "", errors.New("frontmatter not closed with ---")
 	}
 
-	fm := map[string]any{}
-	currentKey := ""
-	for _, raw := range lines[1:end] {
-		line := strings.TrimRight(raw, "\r")
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
+	var payload frontmatter
+	decoder := yaml.NewDecoder(bytes.NewReader([]byte(strings.Join(lines[1:end], "\n"))))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, "", err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return nil, "", errors.New("frontmatter must contain a single document")
 		}
-		if strings.HasPrefix(strings.TrimLeft(line, " \t"), "-") && currentKey != "" {
-			arr, ok := fm[currentKey].([]string)
-			if !ok {
-				return nil, "", fmt.Errorf("invalid list field: %s", currentKey)
-			}
-			item := strings.TrimSpace(strings.TrimPrefix(strings.TrimLeft(line, " \t"), "-"))
-			fm[currentKey] = append(arr, item)
-			continue
-		}
+		return nil, "", err
+	}
 
-		k, v, found := strings.Cut(line, ":")
-		if !found {
-			return nil, "", fmt.Errorf("invalid frontmatter line: %s", line)
-		}
-		key := strings.TrimSpace(k)
-		val := strings.TrimSpace(v)
-		currentKey = key
-		switch val {
-		case "", "[]":
-			fm[key] = []string{}
-		case "null":
-			fm[key] = nil
-		default:
-			fm[key] = val
-		}
+	subdomainValue := ""
+	if payload.Subdomain != nil {
+		subdomainValue = *payload.Subdomain
+	}
+	capabilityValue := ""
+	if payload.Capability != nil {
+		capabilityValue = *payload.Capability
+	}
+	fm := map[string]any{
+		"id":               payload.ID,
+		"level":            payload.Level,
+		"domain":           payload.Domain,
+		"subdomain":        subdomainValue,
+		"capability":       capabilityValue,
+		"title":            payload.Title,
+		"summary":          payload.Summary,
+		"aliases":          payload.Aliases,
+		"triggers":         payload.Triggers,
+		"anti_triggers":    payload.AntiTriggers,
+		"required_with":    payload.RequiredWith,
+		"may_include":      payload.MayInclude,
+		"children":         payload.Children,
+		"entry_conditions": payload.EntryConditions,
+		"stop_conditions":  payload.StopConditions,
+		"node_kind":        payload.NodeKind,
+		"visibility_scope": payload.VisibilityScope,
+		"activation_mode":  payload.ActivationMode,
 	}
 
 	body := strings.TrimSpace(strings.Join(lines[end+1:], "\n"))
