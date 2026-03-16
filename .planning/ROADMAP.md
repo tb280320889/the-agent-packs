@@ -34,7 +34,7 @@
 
 **Goal:** 完成 brownfield 仓库的语义化结构重构与分批提交治理：先冻结目标目录与迁移映射，再执行迁移与路径修复，最后在“先归档后删除（需确认）”约束下完成可审阅的多批次提交与运行态回写。
 **Depends on:** Phase 1
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 01.1-01-PLAN.md — 冻结目标目录模型、迁移映射与归档清单
