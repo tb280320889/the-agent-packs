@@ -27,12 +27,12 @@ func compileMainIndex(t *testing.T) string {
 	root := projectRoot(t)
 	dbPath := filepath.Join(root, "blueprint", "index", "blueprint.db")
 	reportDir := filepath.Join(root, "blueprint", "index")
-	errList, err := compiler.Compile(filepath.Join(root, "blueprint"), dbPath, reportDir)
+	compileResult, err := compiler.Compile(filepath.Join(root, "blueprint"), dbPath, reportDir)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) > 0 {
-		t.Fatalf("compile has errors: %+v", errList)
+	if len(compileResult.Errors) > 0 {
+		t.Fatalf("compile has errors: %+v", compileResult.Errors)
 	}
 	return dbPath
 }
@@ -237,12 +237,12 @@ func TestFrontmatterSummaryWithColon(t *testing.T) {
 
 	dbPath := filepath.Join(tempDir, "index", "blueprint.db")
 	reportDir := filepath.Join(tempDir, "index")
-	errList, err := compiler.Compile(tempDir, dbPath, reportDir)
+	compileResult, err := compiler.Compile(tempDir, dbPath, reportDir)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) != 0 {
-		t.Fatalf("expected no errors, got %+v", errList)
+	if len(compileResult.Errors) != 0 {
+		t.Fatalf("expected no errors, got %+v", compileResult.Errors)
 	}
 }
 
@@ -260,11 +260,11 @@ func TestFrontmatterMissingRequiredKeysDetected(t *testing.T) {
 
 	dbPath := filepath.Join(tempDir, "index", "blueprint.db")
 	reportDir := filepath.Join(tempDir, "index")
-	errList, err := compiler.Compile(tempDir, dbPath, reportDir)
+	compileResult, err := compiler.Compile(tempDir, dbPath, reportDir)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) == 0 {
+	if len(compileResult.Errors) == 0 {
 		t.Fatalf("expected missing keys errors")
 	}
 }

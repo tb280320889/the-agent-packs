@@ -118,3 +118,16 @@ type ValidationEnvelope struct {
 	ValidationPlan   ValidationPlan    `json:"validation_plan"`
 	ValidatorResults []ValidatorResult `json:"validator_results"`
 }
+
+type CompilerError struct {
+	Phase   string `json:"phase"`
+	Path    string `json:"path"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Line    int    `json:"line,omitempty"`
+	Column  int    `json:"column,omitempty"`
+}
+
+type CompileResult struct {
+	Errors []CompilerError `json:"errors"`
+}

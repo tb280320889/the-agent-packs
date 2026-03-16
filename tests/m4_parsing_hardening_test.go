@@ -172,16 +172,16 @@ func TestM4FrontmatterStrict(t *testing.T) {
 		t.Fatalf("write blueprint fixture failed: %v", err)
 	}
 
-	errList, err := compiler.Compile(root, filepath.Join(base, "index", "blueprint.db"), filepath.Join(base, "index"))
+	result, err := compiler.Compile(root, filepath.Join(base, "index", "blueprint.db"), filepath.Join(base, "index"))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) == 0 {
+	if len(result.Errors) == 0 {
 		t.Fatalf("expected frontmatter unknown field to be reported")
 	}
 	found := false
-	for _, entry := range errList {
-		if entry["path"] == unknownPath {
+	for _, entry := range result.Errors {
+		if entry.Path == unknownPath {
 			found = true
 			break
 		}
@@ -221,12 +221,12 @@ func TestM4FrontmatterYamlVariants(t *testing.T) {
 		t.Fatalf("write blueprint fixture failed: %v", err)
 	}
 
-	errList, err := compiler.Compile(root, filepath.Join(base, "index", "blueprint.db"), filepath.Join(base, "index"))
+	result, err := compiler.Compile(root, filepath.Join(base, "index", "blueprint.db"), filepath.Join(base, "index"))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) != 0 {
-		t.Fatalf("expected no errors, got %+v", errList)
+	if len(result.Errors) != 0 {
+		t.Fatalf("expected no errors, got %+v", result.Errors)
 	}
 }
 
