@@ -28,3 +28,11 @@
 - 将消费侧上下文交付契约进一步固化到实现与验证流程
 - 逐步将旧快照/交接中的长期有效结论转写进 runtime 工件
 - 在后续 GSD 任务中，为 `WXT -> wxt-manifest` 建立更接近实现层的检查项或测试用例
+
+## Phase 01.1 补充上下文
+- 名称：brownfield 大检查与结构治理提交
+- 状态：completed (plans 01/02/03 executed)
+- 边界：仅结构治理、映射、归档门禁与运行态回写；不做功能扩展
+- 删除决策：checkpoint 默认 `option-b`（暂不删除，等待人工明确批准）
+- 关键产物：`01.1-STRUCTURE-AUDIT.md`、`01.1-TARGET-TREE.md`、`01.1-MIGRATION-MAP.md`、`01.1-REFAC-COMMIT-PLAN.md`、`01.1-COMMIT-LOG.md`
+- 风险提示：若长期不做人工确认，`docs/archive/2026-03-phase-01.1/` 会积累待删项

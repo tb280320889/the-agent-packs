@@ -1,7 +1,7 @@
 # GSD State: the-agent-packs
 
 **Initialized:** 2026-03-16  
-**Current Status:** Ready for phase planning
+**Current Status:** Phase 01.1 executed (awaiting commit finalization)
 
 ## Project Reference
 
@@ -55,7 +55,14 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Next Action
 
-执行：`/gsd-plan-phase 1`
+执行：按 `01.1-REFAC-COMMIT-PLAN.md` 分批提交，并在获得人工确认后决定是否删除归档候选。
+
+## Phase 01.1 Execution Snapshot
+
+- plans executed: `01.1-01`, `01.1-02`, `01.1-03`
+- outputs ready: 结构审计、目标树、迁移映射、归档清单、提交切片计划、阶段总结
+- checkpoint decision: `option-b`（暂不删除）
+- validation: `go test ./...` pass
 
 ---
-*Last updated: 2026-03-16 after roadmap creation*
+*Last updated: 2026-03-16 after phase 01.1 execution*
