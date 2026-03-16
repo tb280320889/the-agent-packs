@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -39,5 +40,31 @@ func TestM4CompileErrors(t *testing.T) {
 	}
 	if !foundPhase || !foundPath || !foundCode {
 		t.Fatalf("expected structured error with phase/path/code, got %+v", result.Errors)
+	}
+}
+
+func TestM4CompileErrorsReportWrite(t *testing.T) {
+	root := projectRoot(t)
+	base := t.TempDir()
+	dbPath := filepath.Join(base, "index", "blueprint.db")
+	reportFilePath := filepath.Join(base, "report-as-file")
+	if err := os.WriteFile(reportFilePath, []byte("not-a-directory"), 0o644); err != nil {
+		t.Fatalf("write report file fixture failed: %v", err)
+	}
+
+	result, err := compiler.Compile(filepath.Join(root, "blueprint"), dbPath, reportFilePath)
+	if err == nil {
+		t.Fatalf("expected compile failure on report write")
+	}
+
+	found := false
+	for _, entry := range result.Errors {
+		if entry.Phase == string(compiler.PhaseReport) && entry.Code == "report_write" && entry.Path == reportFilePath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected report_write structured error, got %+v", result.Errors)
 	}
 }
