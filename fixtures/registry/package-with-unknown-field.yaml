@@ -1,0 +1,14 @@
+name: demo-unknown
+kind: workflow-package
+domain: demo
+subdomain: unknown
+layer: workflow
+version: "0.1.0"
+goal: "demo fixture for unknown field"
+inputs: []
+depends_on: []
+validators:
+  - validator-core-output
+artifacts:
+  - demo.md
+unknown_field: "should-fail"
