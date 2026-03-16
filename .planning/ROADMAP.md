@@ -22,6 +22,14 @@
 
 **Requirements:** PARS-01, PARS-02, INDX-01, INDX-02
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — package.yaml 与 frontmatter 严格 YAML 解析硬化
+- [ ] 01-02-PLAN.md — 事务化索引重建与结构化编译错误输出
+- [ ] 01-03-PLAN.md — 解析回归测试与固定 fixture 基线
+- [ ] 01-04-PLAN.md — 关闭验证缺口：报告失败场景下旧索引保留与回归验证
+
 **Success Criteria:**
 1. `package.yaml` 解析对未知/非法字段可稳定报错（非静默忽略）。
 2. Blueprint frontmatter 解析覆盖列表、引号、多行等常见语法。
