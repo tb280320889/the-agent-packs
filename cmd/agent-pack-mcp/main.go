@@ -44,16 +44,11 @@ func cmdCompile(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	errs, err := compiler.Compile(*root, *db, *reportDir)
+	result, err := compiler.Compile(*root, *db, *reportDir)
 	if err != nil {
 		return err
 	}
-	if len(errs) > 0 {
-		fmt.Println("compile completed with validation errors")
-		return nil
-	}
-	fmt.Println("compile completed")
-	return nil
+	return printJSON(result)
 }
 
 func cmdRouteQuery(args []string) error {
@@ -419,12 +414,12 @@ func cmdMCP(args []string) error {
 				if reportDir == "" {
 					reportDir = "blueprint/index"
 				}
-				errs, err := compiler.Compile(root, *dbPath, reportDir)
+				result, err := compiler.Compile(root, *dbPath, reportDir)
 				if err != nil {
 					mcpErr(req.ID, -32000, err.Error())
 					continue
 				}
-				mcpResult(req.ID, map[string]any{"content": []map[string]any{{"type": "text", "text": toJSONString(map[string]any{"errors": errs})}}})
+				mcpResult(req.ID, map[string]any{"content": []map[string]any{{"type": "text", "text": toJSONString(result)}}})
 			default:
 				mcpErr(req.ID, -32601, "unknown tool")
 			}

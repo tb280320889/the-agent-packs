@@ -230,7 +230,7 @@ func TestFrontmatterSummaryWithColon(t *testing.T) {
 		t.Fatalf("mkdir failed: %v", err)
 	}
 	filePath := filepath.Join(l0Dir, "overview.md")
-	content := "---\nid: L0.demo\nlevel: L0\ndomain: demo\nsubdomain: null\ncapability: null\nnode_kind: domain-root\nvisibility_scope: global\nactivation_mode: direct\ntitle: Demo\nsummary: This summary has colon: valid content\naliases: []\ntriggers:\n  - demo\nanti_triggers: []\nrequired_with: []\nmay_include: []\nchildren: []\nentry_conditions: []\nstop_conditions: []\n---\n\ndemo body\n"
+	content := "---\nid: L0.demo\nlevel: L0\ndomain: demo\nsubdomain: null\ncapability: null\nnode_kind: domain-root\nvisibility_scope: global\nactivation_mode: direct\ntitle: Demo\nsummary: \"This summary has colon: valid content\"\naliases: []\ntriggers:\n  - demo\nanti_triggers: []\nrequired_with: []\nmay_include: []\nchildren: []\nentry_conditions: []\nstop_conditions: []\n---\n\ndemo body\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("write file failed: %v", err)
 	}
