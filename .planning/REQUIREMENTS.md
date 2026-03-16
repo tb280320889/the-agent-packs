@@ -9,8 +9,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Parsing & Index
 
-- [ ] **PARS-01**: Maintainer can parse `package.yaml` with standard YAML parser and fail fast on invalid fields
-- [ ] **PARS-02**: Maintainer can parse Blueprint frontmatter with robust YAML semantics (not string-split)
+- [x] **PARS-01**: Maintainer can parse `package.yaml` with standard YAML parser and fail fast on invalid fields
+- [x] **PARS-02**: Maintainer can parse Blueprint frontmatter with robust YAML semantics (not string-split)
 - [ ] **INDX-01**: Maintainer can rebuild index transactionally so failed compile does not leave partial DB
 - [ ] **INDX-02**: Maintainer can detect index build/report write failure with explicit error outcome
 
@@ -66,8 +66,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARS-01 | Phase 1 | Pending |
-| PARS-02 | Phase 1 | Pending |
+| PARS-01 | Phase 1 | Complete |
+| PARS-02 | Phase 1 | Complete |
 | INDX-01 | Phase 1 | Pending |
 | INDX-02 | Phase 1 | Pending |
 | ROUT-01 | Phase 2 | Pending |
