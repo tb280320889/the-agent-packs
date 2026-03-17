@@ -61,6 +61,8 @@ Each task was committed atomically:
 2. **Task 2: 固化稳定冲突决策链并保留可复现依据** - `b0f8f31` (feat)
 3. **Task 3: 扩展治理回归用例锁死候选污染与附挂边界** - `889030c` (test)
 
+**Plan metadata:** `c0e6385` (docs)
+
 ## Files Created/Modified
 - `internal/query/query.go` - 两阶段候选池过滤、稳定排序、target_pack hard-fail 与 must_include 稳定化
 - `internal/model/model.go` - 新增 `RouteResult.decision_basis` 机器可读解释字段
