@@ -11,7 +11,7 @@
 |---|-------|------|--------------|------------------|
 | 1 | Foundation Hardening | Complete    | 2026-03-17 | 4 |
 | 2 | Routing Governance | 固化路由边界与可解释性，移除隐式回退 | ROUT-01, ROUT-02, ROUT-03, ROUT-04 | 4 |
-| 3 | Contracted Delivery | 让“最小且完整”上下文交付可验证 | CONT-01, CONT-02, CONT-03 | 3 |
+| 3 | Contracted Delivery | Complete    | 2026-03-17 | 3 |
 | 4 | Validation & Runtime Governance | 校验闭环与运行态回写制度化 | VALD-01, VALD-02, GOVR-01 | 3 |
 | 5 | Domain Expansion Pilot | 在护栏内接入第二主域并验证不破坏 WXT | DOMN-01, DOMN-02 | 3 |
 
@@ -73,7 +73,7 @@ Plans:
 
 **Requirements:** CONT-01, CONT-02, CONT-03
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 03-01-PLAN.md — 扩展 Context Bundle 为可解释的 include/exclude 契约交付对象
