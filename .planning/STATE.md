@@ -22,7 +22,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [████████░░] 80%
+- **Progress:** [█████████░] 90%
 - **Current Plan:** 2
 - **Total Plans in Phase:** 2
 - Current Phase: 02
@@ -39,6 +39,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 02]: RouteQuery 统一改为 candidate-space-first，两阶段决策中 attach-only 不进入 primary candidates
 - [Phase 02]: target_pack canonical 不可用场景改为 hard-fail（空候选），移除 registry fallback
 - [Phase 02]: 路由结果新增 decision_basis 供调用方复验稳定 tie-break 依据
+- [Phase 02]: RouteResult 默认输出极简 machine-readable 字段并预留 details/docs_ref 扩展位。
+- [Phase 02]: target_pack canonical 缺失或不可路由统一 hard-fail，错误码固定为 ROUTE_CANONICAL_MISSING。
+- [Phase 02]: ActivationResult 透传 route 语义字段，避免接入层吞掉失败原因。
 
 ## Performance Metrics
 
@@ -49,11 +52,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | Phase 01 P03 | 8 min | 2 tasks | 4 files |
 | Phase 01 P04 | 8 min | 2 tasks | 3 files |
 | Phase 02 P01 | 5 min | 3 tasks | 4 files |
+| Phase 02 P02 | 8 min | 3 tasks | 6 files |
 
 ## Session
 
-- **Last session:** 2026-03-17T03:00:25.696Z
-- **Stopped At:** Completed 02-01-PLAN.md
+- **Last session:** 2026-03-17T03:13:18.894Z
+- **Stopped At:** Completed 02-02-PLAN.md
 - **Resume file:** None
 
 ## Roadmap Snapshot
