@@ -102,6 +102,27 @@ func TestM3NegativeWrongTargetPackNotOverriddenByHint(t *testing.T) {
 	if result.Candidates[0].ActivationMode != "attach-only" {
 		t.Fatalf("expected attach-only metadata to be preserved, got %+v", result.Candidates[0])
 	}
+	if result.DecisionBasis != "target_pack>canonical_exact" {
+		t.Fatalf("expected target_pack decision basis, got %s", result.DecisionBasis)
+	}
+}
+
+func TestRouteTargetPackCanonicalUnavailableAtLevelReturnsNoPrimaryCandidate(t *testing.T) {
+	dbPath := compileMainIndex(t)
+	db := openDB(t, dbPath)
+	defer db.Close()
+
+	tp := "security-permissions"
+	result, err := query.RouteQuery(db, "L0", "manifest permissions review", &tp, nil, nil, nil, nil, 3)
+	if err != nil {
+		t.Fatalf("route query failed: %v", err)
+	}
+	if len(result.Candidates) != 0 {
+		t.Fatalf("expected no candidates when canonical mapping is unavailable for level, got %+v", result.Candidates)
+	}
+	if result.DecisionBasis != "target_pack>canonical_missing_hard_fail" {
+		t.Fatalf("unexpected decision basis for unresolved target pack: %s", result.DecisionBasis)
+	}
 }
 
 func TestM3NegativeBundleNotDefaultDeepRead(t *testing.T) {

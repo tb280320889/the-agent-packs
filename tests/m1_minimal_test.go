@@ -107,6 +107,9 @@ func TestRouteTargetPackHasHighestPriority(t *testing.T) {
 	if !found {
 		t.Fatalf("target_pack match reason missing")
 	}
+	if result.DecisionBasis != "target_pack>canonical_exact" {
+		t.Fatalf("unexpected decision basis: %s", result.DecisionBasis)
+	}
 }
 
 func TestRouteRespectsTargetDomain(t *testing.T) {
@@ -205,6 +208,12 @@ func TestRouteDomainCompetitionExcludesAttachOnlyCapability(t *testing.T) {
 	}
 	if len(result.MustInclude) != 2 {
 		t.Fatalf("expected deduplicated must_include entries, got %+v", result.MustInclude)
+	}
+	if result.MustInclude[0] != "L1.release.store-review" || result.MustInclude[1] != "L1.security.permissions" {
+		t.Fatalf("expected stable sorted must_include entries, got %+v", result.MustInclude)
+	}
+	if result.DecisionBasis != "score>canonical>domain>rule>lexicographic" {
+		t.Fatalf("unexpected decision basis for L1: %s", result.DecisionBasis)
 	}
 }
 
