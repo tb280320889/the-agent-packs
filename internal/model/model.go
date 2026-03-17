@@ -83,14 +83,26 @@ type NodeSummary struct {
 	Level   string `json:"level"`
 }
 
+type ContractDecision struct {
+	NodeID        string `json:"node_id"`
+	Action        string `json:"action"`
+	ReasonCode    string `json:"reason_code"`
+	SourceRule    string `json:"source_rule"`
+	Scope         string `json:"scope"`
+	DecisionBasis string `json:"decision_basis"`
+	HumanNote     string `json:"human_note"`
+}
+
 type ContextBundle struct {
-	Main                  *NodeSummary  `json:"main"`
-	Required              []NodeSummary `json:"required"`
-	ExecutionChildren     []NodeSummary `json:"execution_children"`
-	Deferred              []NodeSummary `json:"deferred"`
-	RequiredPacks         []string      `json:"required_packs"`
-	RecommendedValidators []string      `json:"recommended_validators"`
-	RecommendedArtifacts  []string      `json:"recommended_artifacts"`
+	Main                  *NodeSummary       `json:"main"`
+	Required              []NodeSummary      `json:"required"`
+	ExecutionChildren     []NodeSummary      `json:"execution_children"`
+	Deferred              []NodeSummary      `json:"deferred"`
+	IncludedDecisions     []ContractDecision `json:"included_decisions"`
+	ExcludedDecisions     []ContractDecision `json:"excluded_decisions"`
+	RequiredPacks         []string           `json:"required_packs"`
+	RecommendedValidators []string           `json:"recommended_validators"`
+	RecommendedArtifacts  []string           `json:"recommended_artifacts"`
 }
 
 type ActivationResult struct {
