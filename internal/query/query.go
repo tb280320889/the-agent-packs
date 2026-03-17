@@ -791,14 +791,26 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		}
 	}
 
-	nodesAtL1, err := fetchNodes(db, ptrString("L1"))
+	nodesForContract, err := fetchNodes(db, nil)
 	if err != nil {
 		return bundle, err
 	}
-	for _, candidate := range nodesAtL1 {
+	for _, candidate := range nodesForContract {
+		if candidate.ID == mainNode {
+			continue
+		}
 		inTargetDomain := candidate.Domain == mainRecord.Domain && candidate.ActivationMode != "attach-only"
 		isLegalAttach := legalAttachSet[candidate.ID] && candidate.ActivationMode == "attach-only"
 		if !inTargetDomain && !isLegalAttach {
+			bundle.ExcludedDecisions = append(bundle.ExcludedDecisions, model.ContractDecision{
+				NodeID:        candidate.ID,
+				Action:        "exclude",
+				ReasonCode:    "EXCLUDE_OUT_OF_SCOPE_DOMAIN",
+				SourceRule:    "CONT-01",
+				Scope:         "domain_boundary",
+				DecisionBasis: "target_domain_plus_legal_attach_only",
+				HumanNote:     "节点位于目标主域之外或不在合法 attach-only 候选集中，按域边界规则排除。",
+			})
 			continue
 		}
 		if includedSet[candidate.ID] {
@@ -828,10 +840,6 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 	}
 
 	return bundle, nil
-}
-
-func ptrString(v string) *string {
-	return &v
 }
 
 func ExpandNode(db *sql.DB, nodeID, edgeType string) ([]string, error) {
