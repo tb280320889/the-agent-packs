@@ -36,19 +36,43 @@ type Edge struct {
 
 type RouteCandidate struct {
 	ID              string   `json:"id"`
+	Pack            string   `json:"pack,omitempty"`
 	Title           string   `json:"title"`
 	Summary         string   `json:"summary"`
 	Score           float64  `json:"score"`
 	Reason          []string `json:"reason"`
+	ReasonCode      string   `json:"reason_code,omitempty"`
+	RuleRef         string   `json:"rule_ref,omitempty"`
+	NextAction      string   `json:"next_action,omitempty"`
+	DocsRef         string   `json:"docs_ref"`
 	NodeKind        string   `json:"node_kind,omitempty"`
 	VisibilityScope string   `json:"visibility_scope,omitempty"`
 	ActivationMode  string   `json:"activation_mode,omitempty"`
 }
 
+type RouteCapabilityDecision struct {
+	Pack       string `json:"pack"`
+	NodeID     string `json:"node_id"`
+	Attached   bool   `json:"attached"`
+	ReasonCode string `json:"reason_code"`
+	RuleRef    string `json:"rule_ref"`
+	Message    string `json:"message"`
+	NextAction string `json:"next_action,omitempty"`
+	DocsRef    string `json:"docs_ref"`
+}
+
 type RouteResult struct {
-	Candidates    []RouteCandidate `json:"candidates"`
-	MustInclude   []string         `json:"must_include"`
-	DecisionBasis string           `json:"decision_basis,omitempty"`
+	Status              string                    `json:"status"`
+	ErrorCode           string                    `json:"error_code,omitempty"`
+	Message             string                    `json:"message,omitempty"`
+	NextAction          string                    `json:"next_action,omitempty"`
+	DecisionBasis       string                    `json:"decision_basis,omitempty"`
+	DecisionTraceID     string                    `json:"decision_trace_id,omitempty"`
+	DocsRef             string                    `json:"docs_ref"`
+	Candidates          []RouteCandidate          `json:"candidates"`
+	MustInclude         []string                  `json:"must_include"`
+	CapabilityDecisions []RouteCapabilityDecision `json:"capability_decisions,omitempty"`
+	Details             map[string]any            `json:"details,omitempty"`
 }
 
 type NodeSummary struct {

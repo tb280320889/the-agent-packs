@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,6 +34,17 @@ type nodeRecord struct {
 	Title           string
 	Summary         string
 }
+
+const (
+	routeStatusCompleted          = "completed"
+	routeStatusPartial            = "partial"
+	routeStatusFailed             = "failed"
+	routeErrCanonicalMissing      = "ROUTE_CANONICAL_MISSING"
+	routeErrNoPrimaryCandidate    = "ROUTE_NO_PRIMARY_CANDIDATE"
+	routeNextActionCheckCanonical = "检查 registry canonical 映射"
+	routeNextActionRefineEvidence = "补充 target_domain 或上下文证据后重试"
+	routeNextActionRefineTask     = "补充 task 关键词或指定 target_pack 后重试"
+)
 
 func PackForNode(nodeID string) string {
 	profile, ok := profileForNode(nodeID)
@@ -263,15 +275,50 @@ func inferMainDomain(task string, selectedFiles, configFragments, contextHints [
 }
 
 func buildCandidate(candidate nodeRecord, score float64, reason []string) model.RouteCandidate {
+	pack := PackForNode(candidate.ID)
 	return model.RouteCandidate{
 		ID:              candidate.ID,
+		Pack:            pack,
 		Title:           candidate.Title,
 		Summary:         candidate.Summary,
 		Score:           score,
 		Reason:          reason,
+		ReasonCode:      "PRIMARY_CANDIDATE_SELECTED",
+		RuleRef:         "BR-08",
+		DocsRef:         "",
 		NodeKind:        candidate.NodeKind,
 		VisibilityScope: candidate.VisibilityScope,
 		ActivationMode:  candidate.ActivationMode,
+	}
+}
+
+func buildTraceID(level string, targetPack *string, targetDomain *string, activeDomain string, status string) string {
+	tp := "none"
+	if targetPack != nil && strings.TrimSpace(*targetPack) != "" {
+		tp = strings.TrimSpace(*targetPack)
+	}
+	td := "none"
+	if targetDomain != nil && strings.TrimSpace(*targetDomain) != "" {
+		td = strings.TrimSpace(*targetDomain)
+	}
+	ad := strings.TrimSpace(activeDomain)
+	if ad == "" {
+		ad = "none"
+	}
+	return fmt.Sprintf("route:%s:%s:%s:%s:%s", strings.ToLower(level), tp, td, ad, strings.ToLower(status))
+}
+
+func buildCanonicalMissingResult(level string, targetPack *string, targetDomain *string, activeDomain string) model.RouteResult {
+	return model.RouteResult{
+		Status:          routeStatusFailed,
+		ErrorCode:       routeErrCanonicalMissing,
+		Message:         "target_pack canonical mapping is missing or unroutable",
+		NextAction:      routeNextActionCheckCanonical,
+		DecisionBasis:   "target_pack>canonical_missing_hard_fail",
+		DecisionTraceID: buildTraceID(level, targetPack, targetDomain, activeDomain, routeStatusFailed),
+		DocsRef:         "",
+		Candidates:      []model.RouteCandidate{},
+		MustInclude:     []string{},
 	}
 }
 
@@ -380,18 +427,25 @@ func dedupeAndSortIDs(values []string) []string {
 }
 
 func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targetDomain *string, selectedFiles, configFragments, contextHints []string, maxResults int) (model.RouteResult, error) {
+	activeDomain := ""
+	if targetDomain != nil {
+		activeDomain = *targetDomain
+	} else {
+		activeDomain = inferMainDomain(task, selectedFiles, configFragments, contextHints)
+	}
+
 	if targetPack != nil {
 		reg, regErr := registry.Default()
 		if regErr == nil {
 			if entry, ok := registry.FindByName(reg, *targetPack); ok {
 				mappedNode := strings.TrimSpace(entry.CanonicalBlueprintNode)
 				if mappedNode == "" {
-					return model.RouteResult{Candidates: []model.RouteCandidate{}, MustInclude: []string{}, DecisionBasis: "target_pack>canonical_missing_hard_fail"}, nil
+					return buildCanonicalMissingResult(level, targetPack, targetDomain, activeDomain), nil
 				}
 				directRec, recErr := fetchNodeRecord(db, mappedNode)
 				direct, err := ReadNode(db, mappedNode, "summary")
 				if err != nil || recErr != nil || direct == nil || direct.Level != level {
-					return model.RouteResult{Candidates: []model.RouteCandidate{}, MustInclude: []string{}, DecisionBasis: "target_pack>canonical_missing_hard_fail"}, nil
+					return buildCanonicalMissingResult(level, targetPack, targetDomain, activeDomain), nil
 				}
 
 				must := []string{}
@@ -411,19 +465,39 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 				if targetDomain != nil {
 					reason = append(reason, "target_domain ignored due to explicit target_pack")
 				}
+				candidate := model.RouteCandidate{
+					ID:              direct.ID,
+					Pack:            PackForNode(direct.ID),
+					Title:           direct.Title,
+					Summary:         direct.Summary,
+					Score:           99.0,
+					Reason:          reason,
+					ReasonCode:      "TARGET_PACK_EXACT",
+					RuleRef:         "BR-04",
+					DocsRef:         "",
+					NodeKind:        directRec.NodeKind,
+					VisibilityScope: directRec.VisibilityScope,
+					ActivationMode:  directRec.ActivationMode,
+				}
 				return model.RouteResult{
-					Candidates: []model.RouteCandidate{{
-						ID:              direct.ID,
-						Title:           direct.Title,
-						Summary:         direct.Summary,
-						Score:           99.0,
-						Reason:          reason,
-						NodeKind:        directRec.NodeKind,
-						VisibilityScope: directRec.VisibilityScope,
-						ActivationMode:  directRec.ActivationMode,
-					}},
-					MustInclude:   dedupeAndSortIDs(must),
-					DecisionBasis: "target_pack>canonical_exact",
+					Status:          routeStatusCompleted,
+					Message:         "routed by explicit target_pack",
+					DecisionBasis:   "target_pack>canonical_exact",
+					DecisionTraceID: buildTraceID(level, targetPack, targetDomain, activeDomain, routeStatusCompleted),
+					DocsRef:         "",
+					Candidates:      []model.RouteCandidate{candidate},
+					MustInclude:     dedupeAndSortIDs(must),
+					CapabilityDecisions: []model.RouteCapabilityDecision{
+						{
+							Pack:       candidate.Pack,
+							NodeID:     candidate.ID,
+							Attached:   true,
+							ReasonCode: "PRIMARY_BY_TARGET_PACK",
+							RuleRef:    "BR-04",
+							Message:    "explicit target_pack selected as primary",
+							DocsRef:    "",
+						},
+					},
 				}, nil
 			}
 		}
@@ -433,13 +507,6 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 	nodes, err := fetchNodes(db, &levelArg)
 	if err != nil {
 		return model.RouteResult{}, err
-	}
-
-	activeDomain := ""
-	if targetDomain != nil {
-		activeDomain = *targetDomain
-	} else {
-		activeDomain = inferMainDomain(task, selectedFiles, configFragments, contextHints)
 	}
 
 	globalPool := make([]nodeRecord, 0)
@@ -517,6 +584,19 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 		selected = selected[:maxResults]
 	}
 
+	capabilityDecisions := make([]model.RouteCapabilityDecision, 0, len(attachIDs))
+	for _, attachID := range attachIDs {
+		capabilityDecisions = append(capabilityDecisions, model.RouteCapabilityDecision{
+			Pack:       PackForNode(attachID),
+			NodeID:     attachID,
+			Attached:   true,
+			ReasonCode: "CAPABILITY_ATTACHED",
+			RuleRef:    "BR-03",
+			Message:    "attach-only capability attached after primary selection",
+			DocsRef:    "",
+		})
+	}
+
 	must := []string{}
 	if len(selected) > 0 {
 		must, _ = fetchEdges(db, selected[0].ID, "required_with")
@@ -534,10 +614,49 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 	}
 
 	decisionBasis := "score>canonical>domain>rule>lexicographic"
+	status := routeStatusCompleted
+	errCode := ""
+	message := "primary candidate selected"
+	nextAction := ""
 	if len(selected) == 0 {
 		decisionBasis = "candidate_space_filtered_no_primary"
+		errCode = routeErrNoPrimaryCandidate
+		if targetDomain != nil {
+			status = routeStatusPartial
+			message = "no primary candidate matched in target_domain"
+			nextAction = routeNextActionRefineEvidence
+		} else {
+			status = routeStatusFailed
+			message = "no route candidate"
+			nextAction = routeNextActionRefineTask
+		}
+		capabilityDecisions = make([]model.RouteCapabilityDecision, 0, len(attachIDs))
+		for _, attachID := range attachIDs {
+			capabilityDecisions = append(capabilityDecisions, model.RouteCapabilityDecision{
+				Pack:       PackForNode(attachID),
+				NodeID:     attachID,
+				Attached:   false,
+				ReasonCode: "CAPABILITY_DENIED_NO_PRIMARY",
+				RuleRef:    "BR-02",
+				Message:    "capability cannot attach before primary selection",
+				NextAction: routeNextActionRefineEvidence,
+				DocsRef:    "",
+			})
+		}
 	}
-	return model.RouteResult{Candidates: selected, MustInclude: must, DecisionBasis: decisionBasis}, nil
+
+	return model.RouteResult{
+		Status:              status,
+		ErrorCode:           errCode,
+		Message:             message,
+		NextAction:          nextAction,
+		DecisionBasis:       decisionBasis,
+		DecisionTraceID:     buildTraceID(level, targetPack, targetDomain, activeDomain, status),
+		DocsRef:             "",
+		Candidates:          selected,
+		MustInclude:         must,
+		CapabilityDecisions: capabilityDecisions,
+	}, nil
 }
 
 func ReadNode(db *sql.DB, nodeID string, section string) (*model.NodeSummary, error) {
