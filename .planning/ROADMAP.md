@@ -9,7 +9,7 @@
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 1 | Foundation Hardening | 消除解析与索引层脆弱点，建立稳定底座 | PARS-01, PARS-02, INDX-01, INDX-02 | 4 |
+| 1 | Foundation Hardening | Complete    | 2026-03-17 | 4 |
 | 2 | Routing Governance | 固化路由边界与可解释性，移除隐式回退 | ROUT-01, ROUT-02, ROUT-03, ROUT-04 | 4 |
 | 3 | Contracted Delivery | 让“最小且完整”上下文交付可验证 | CONT-01, CONT-02, CONT-03 | 3 |
 | 4 | Validation & Runtime Governance | 校验闭环与运行态回写制度化 | VALD-01, VALD-02, GOVR-01 | 3 |
@@ -22,7 +22,7 @@
 
 **Requirements:** PARS-01, PARS-02, INDX-01, INDX-02
 
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 
 Plans:
 - [ ] 01-01-PLAN.md — package.yaml 与 frontmatter 严格 YAML 解析硬化
