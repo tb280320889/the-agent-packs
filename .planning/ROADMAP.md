@@ -54,6 +54,12 @@ Plans:
 
 **Requirements:** ROUT-01, ROUT-02, ROUT-03, ROUT-04
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — 重构 route 治理内核：candidate-space-first 与 attach-only 两阶段决策
+- [ ] 02-02-PLAN.md — 固化可解释输出与 canonical 缺失显式失败语义
+
 **Success Criteria:**
 1. 所有路由路径先执行候选空间过滤再评分。
 2. capability 不会在主域未确认前成为 primary 结果。

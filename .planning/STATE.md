@@ -1,14 +1,14 @@
 # GSD State: the-agent-packs
 
 **Initialized:** 2026-03-16  
-**Current Status:** Phase 01 Plan 04 executed
+**Current Status:** Phase 02 Plan 01 executed
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 **Core value:** 在不泄露全仓语义的前提下，向消费侧稳定交付目标域最小且完整的上下文。  
-**Current focus:** Phase 1 — Foundation Hardening
+**Current focus:** Phase 2 — Routing Governance
 
 ## Workflow Configuration Snapshot
 
@@ -22,11 +22,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [█████████░] 88%
-- **Current Plan:** Not started
-- **Total Plans in Phase:** 4
-- Current Phase: 01
-- Phase 01 Plans Completed: 4/4
+- **Progress:** [████████░░] 80%
+- **Current Plan:** 2
+- **Total Plans in Phase:** 2
+- Current Phase: 02
+- Phase 02 Plans Completed: 1/2
 
 ## Decisions
 
@@ -36,6 +36,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 01]: 解析回归测试采用固定 fixture 覆盖多行 frontmatter 与未知字段
 - [Phase 01]: Compile 仅在 writeReports 成功后执行索引原子替换，失败路径不触碰旧索引
 - [Phase 01]: 索引回归测试以旧索引可查询和内容稳定为失败路径真值
+- [Phase 02]: RouteQuery 统一改为 candidate-space-first，两阶段决策中 attach-only 不进入 primary candidates
+- [Phase 02]: target_pack canonical 不可用场景改为 hard-fail（空候选），移除 registry fallback
+- [Phase 02]: 路由结果新增 decision_basis 供调用方复验稳定 tie-break 依据
 
 ## Performance Metrics
 
@@ -45,12 +48,13 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | 01 | 02 | 3 min | 3 | 9 | 2026-03-16T13:32:33Z |
 | Phase 01 P03 | 8 min | 2 tasks | 4 files |
 | Phase 01 P04 | 8 min | 2 tasks | 3 files |
+| Phase 02 P01 | 5 min | 3 tasks | 4 files |
 
 ## Session
 
-- **Last session:** 2026-03-17T01:02:50.153Z
-- **Stopped At:** Phase 2 context gathered
-- **Resume file:** .planning/phases/02-routing-governance/02-CONTEXT.md
+- **Last session:** 2026-03-17T03:00:25.696Z
+- **Stopped At:** Completed 02-01-PLAN.md
+- **Resume file:** None
 
 ## Roadmap Snapshot
 
@@ -87,7 +91,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Next Action
 
-执行：进入 Phase 02 规划或执行。
+执行：继续 Phase 02 Plan 02。
 
 ## Phase 01.1 Execution Snapshot
 
