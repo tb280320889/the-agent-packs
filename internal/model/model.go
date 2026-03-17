@@ -97,6 +97,12 @@ type ActivationResult struct {
 	RequestID         string               `json:"request_id"`
 	Status            string               `json:"status"`
 	MainPack          *string              `json:"main_pack"`
+	RouteStatus       string               `json:"route_status,omitempty"`
+	RouteErrorCode    string               `json:"route_error_code,omitempty"`
+	RouteNextAction   string               `json:"route_next_action,omitempty"`
+	RouteDecision     string               `json:"route_decision_basis,omitempty"`
+	RouteTraceID      string               `json:"route_decision_trace_id,omitempty"`
+	RouteDocsRef      string               `json:"route_docs_ref"`
 	Artifacts         []Artifact           `json:"artifacts"`
 	ValidationResults []ValidationEnvelope `json:"validation_results"`
 	Handoff           map[string]any       `json:"handoff"`

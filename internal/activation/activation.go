@@ -193,6 +193,12 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 			RequestID:         req.RequestID,
 			Status:            "failed",
 			MainPack:          nil,
+			RouteStatus:       "failed",
+			RouteErrorCode:    "ACTIVATION_REQUEST_INVALID",
+			RouteNextAction:   "补全 request_id/task/bounded_context 后重试",
+			RouteDecision:     "activation_request_validation",
+			RouteTraceID:      "activation:request:invalid",
+			RouteDocsRef:      "",
 			Artifacts:         []model.Artifact{},
 			ValidationResults: []model.ValidationEnvelope{},
 			Handoff:           nil,
@@ -225,20 +231,32 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 				RequestID:         req.RequestID,
 				Status:            "partial",
 				MainPack:          nil,
+				RouteStatus:       routeResult.Status,
+				RouteErrorCode:    routeResult.ErrorCode,
+				RouteNextAction:   routeResult.NextAction,
+				RouteDecision:     routeResult.DecisionBasis,
+				RouteTraceID:      routeResult.DecisionTraceID,
+				RouteDocsRef:      routeResult.DocsRef,
 				Artifacts:         []model.Artifact{},
 				ValidationResults: []model.ValidationEnvelope{},
 				Handoff:           nil,
-				Summary:           "insufficient evidence for L1, fallback to L0 recommended",
+				Summary:           routeResult.Message,
 			}, nil
 		}
 		return model.ActivationResult{
 			RequestID:         req.RequestID,
 			Status:            "failed",
 			MainPack:          nil,
+			RouteStatus:       routeResult.Status,
+			RouteErrorCode:    routeResult.ErrorCode,
+			RouteNextAction:   routeResult.NextAction,
+			RouteDecision:     routeResult.DecisionBasis,
+			RouteTraceID:      routeResult.DecisionTraceID,
+			RouteDocsRef:      routeResult.DocsRef,
 			Artifacts:         []model.Artifact{},
 			ValidationResults: []model.ValidationEnvelope{},
 			Handoff:           nil,
-			Summary:           "no route candidate",
+			Summary:           routeResult.Message,
 		}, nil
 	}
 
@@ -295,10 +313,16 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	}
 
 	return model.ActivationResult{
-		RequestID: req.RequestID,
-		Status:    status,
-		MainPack:  ptr(mainPack),
-		Artifacts: artifacts,
+		RequestID:       req.RequestID,
+		Status:          status,
+		MainPack:        ptr(mainPack),
+		RouteStatus:     routeResult.Status,
+		RouteErrorCode:  routeResult.ErrorCode,
+		RouteNextAction: routeResult.NextAction,
+		RouteDecision:   routeResult.DecisionBasis,
+		RouteTraceID:    routeResult.DecisionTraceID,
+		RouteDocsRef:    routeResult.DocsRef,
+		Artifacts:       artifacts,
 		ValidationResults: []model.ValidationEnvelope{{
 			ValidationPlan:   plan,
 			ValidatorResults: validatorResults,

@@ -322,6 +322,7 @@ func cmdMCP(args []string) error {
 		case "tools/list":
 			mcpResult(req.ID, map[string]any{"tools": []map[string]any{
 				{"name": "route_query", "description": "Route task to blueprint node"},
+				{"name": "activate", "description": "Execute activation request and return status summary"},
 				{"name": "read_node", "description": "Read node summary/body"},
 				{"name": "build_context_bundle", "description": "Build minimal context bundle"},
 				{"name": "expand_node", "description": "Expand node edges"},
@@ -365,6 +366,18 @@ func cmdMCP(args []string) error {
 					td = &targetDomain
 				}
 				result, err := query.RouteQuery(conn, level, task, tp, td, selectedFiles, configFragments, contextHints, maxResults)
+				if err != nil {
+					mcpErr(req.ID, -32000, err.Error())
+					continue
+				}
+				mcpResult(req.ID, map[string]any{"content": []map[string]any{{"type": "text", "text": toJSONString(result)}}})
+			case "activate":
+				requestPath := parseParamString(argsRaw, "request_path")
+				if strings.TrimSpace(requestPath) == "" {
+					mcpErr(req.ID, -32602, "request_path is required")
+					continue
+				}
+				result, err := activation.Execute(conn, requestPath)
 				if err != nil {
 					mcpErr(req.ID, -32000, err.Error())
 					continue
