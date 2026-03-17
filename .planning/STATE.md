@@ -1,14 +1,14 @@
 # GSD State: the-agent-packs
 
 **Initialized:** 2026-03-16  
-**Current Status:** Phase 02 Plan 01 executed
+**Current Status:** Phase 03 Plan 01 executed
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 **Core value:** 在不泄露全仓语义的前提下，向消费侧稳定交付目标域最小且完整的上下文。  
-**Current focus:** Phase 2 — Routing Governance
+**Current focus:** Phase 3 — Contracted Delivery
 
 ## Workflow Configuration Snapshot
 
@@ -22,11 +22,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [█████████░] 90%
-- **Current Plan:** Not started
+- **Progress:** [████████░░] 83%
+- **Current Plan:** 2
 - **Total Plans in Phase:** 2
-- Current Phase: 02
-- Phase 02 Plans Completed: 1/2
+- Current Phase: 03
+- Phase 03 Plans Completed: 1/2
 
 ## Decisions
 
@@ -42,6 +42,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 02]: RouteResult 默认输出极简 machine-readable 字段并预留 details/docs_ref 扩展位。
 - [Phase 02]: target_pack canonical 缺失或不可路由统一 hard-fail，错误码固定为 ROUTE_CANONICAL_MISSING。
 - [Phase 02]: ActivationResult 透传 route 语义字段，避免接入层吞掉失败原因。
+- [Phase 03]: ContextBundle 新增 included/excluded contract decisions，作为交付契约真相源。
+- [Phase 03]: BuildContextBundle 对目标域外与非必需 attach-only 节点统一输出 exclude rationale，稳定支持机检。
 
 ## Performance Metrics
 
@@ -53,12 +55,13 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | Phase 01 P04 | 8 min | 2 tasks | 3 files |
 | Phase 02 P01 | 5 min | 3 tasks | 4 files |
 | Phase 02 P02 | 8 min | 3 tasks | 6 files |
+| Phase 03 P01 | 25 min | 3 tasks | 3 files |
 
 ## Session
 
-- **Last session:** 2026-03-17T03:31:35.000Z
-- **Stopped At:** Phase 3 context gathered
-- **Resume file:** .planning/phases/03-contracted-delivery/03-CONTEXT.md
+- **Last session:** 2026-03-17T04:04:55.933Z
+- **Stopped At:** Completed 03-01-PLAN.md
+- **Resume file:** None
 
 ## Roadmap Snapshot
 
@@ -95,7 +98,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Next Action
 
-执行：继续 Phase 02 Plan 02。
+执行：继续 Phase 03 Plan 02。
 
 ## Phase 01.1 Execution Snapshot
 
@@ -105,4 +108,4 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - validation: `go test ./...` pass
 
 ---
-*Last updated: 2026-03-17 after 01-04 execution*
+*Last updated: 2026-03-17 after 03-01 execution*

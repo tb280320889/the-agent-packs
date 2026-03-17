@@ -73,6 +73,12 @@ Plans:
 
 **Requirements:** CONT-01, CONT-02, CONT-03
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — 扩展 Context Bundle 为可解释的 include/exclude 契约交付对象
+- [ ] 03-02-PLAN.md — 落地 contract delivery validator 与正负例可重复检查矩阵
+
 **Success Criteria:**
 1. context bundle 仅包含目标域任务必需节点，不混入无关域内容。
 2. 交付对象中包含 include/exclude rationale，且可追溯到规则依据。
