@@ -46,8 +46,9 @@ type RouteCandidate struct {
 }
 
 type RouteResult struct {
-	Candidates  []RouteCandidate `json:"candidates"`
-	MustInclude []string         `json:"must_include"`
+	Candidates    []RouteCandidate `json:"candidates"`
+	MustInclude   []string         `json:"must_include"`
+	DecisionBasis string           `json:"decision_basis,omitempty"`
 }
 
 type NodeSummary struct {
