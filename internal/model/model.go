@@ -146,6 +146,8 @@ type Finding struct {
 	Severity    string `json:"severity"`
 	Code        string `json:"code"`
 	Message     string `json:"message"`
+	RuleRef     string `json:"rule_ref,omitempty"`
+	SourceRule  string `json:"source_rule,omitempty"`
 	ArtifactRef string `json:"artifact_ref"`
 }
 
