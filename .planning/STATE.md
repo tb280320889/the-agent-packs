@@ -22,7 +22,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [████████░░] 83%
+- **Progress:** [█████████░] 92%
 - **Current Plan:** 2
 - **Total Plans in Phase:** 2
 - Current Phase: 03
@@ -44,6 +44,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 02]: ActivationResult 透传 route 语义字段，避免接入层吞掉失败原因。
 - [Phase 03]: ContextBundle 新增 included/excluded contract decisions，作为交付契约真相源。
 - [Phase 03]: BuildContextBundle 对目标域外与非必需 attach-only 节点统一输出 exclude rationale，稳定支持机检。
+- [Phase 03]: 将 contract delivery 检查器作为独立 validator（validator-contract-delivery）接入现有 runner。
+- [Phase 03]: P0 违规固定为 failed(error)，非阻断说明弱问题固定为 warned(warn)。
+- [Phase 03]: validator 输入以 ContextBundle 为契约真相源，Activation 层仅透传 ContractBundle。
 
 ## Performance Metrics
 
@@ -56,11 +59,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | Phase 02 P01 | 5 min | 3 tasks | 4 files |
 | Phase 02 P02 | 8 min | 3 tasks | 6 files |
 | Phase 03 P01 | 25 min | 3 tasks | 3 files |
+| Phase 03 P02 | 7 min | 3 tasks | 7 files |
 
 ## Session
 
-- **Last session:** 2026-03-17T04:04:55.933Z
-- **Stopped At:** Completed 03-01-PLAN.md
+- **Last session:** 2026-03-17T04:23:10.632Z
+- **Stopped At:** Completed 03-02-PLAN.md
 - **Resume file:** None
 
 ## Roadmap Snapshot

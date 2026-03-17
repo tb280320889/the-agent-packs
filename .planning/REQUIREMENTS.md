@@ -25,7 +25,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **CONT-01**: Consumer agent can receive context bundle containing required domain knowledge only
 - [x] **CONT-02**: Consumer agent can inspect include/exclude rationale for delivered context
-- [ ] **CONT-03**: Maintainer can verify “minimal yet complete” delivery with repeatable checks
+- [x] **CONT-03**: Maintainer can verify “minimal yet complete” delivery with repeatable checks
 
 ### Validation & Runtime Governance
 
@@ -76,7 +76,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROUT-04 | Phase 2 | Complete |
 | CONT-01 | Phase 3 | Complete |
 | CONT-02 | Phase 3 | Complete |
-| CONT-03 | Phase 3 | Pending |
+| CONT-03 | Phase 3 | Complete |
 | VALD-01 | Phase 4 | Pending |
 | VALD-02 | Phase 4 | Pending |
 | GOVR-01 | Phase 4 | Pending |
