@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -276,45 +275,155 @@ func buildCandidate(candidate nodeRecord, score float64, reason []string) model.
 	}
 }
 
+func candidateRulePriority(level string, candidate nodeRecord) int {
+	if level == "L0" {
+		switch candidate.NodeKind {
+		case "domain-root":
+			return 0
+		case "domain-orchestrator":
+			return 1
+		default:
+			return 99
+		}
+	}
+	if level == "L1" {
+		switch candidate.NodeKind {
+		case "domain-orchestrator":
+			return 0
+		case "workflow-entry":
+			return 1
+		default:
+			return 99
+		}
+	}
+	return 99
+}
+
+func canonicalHit(candidate nodeRecord) bool {
+	reg, err := registry.Default()
+	if err != nil {
+		return false
+	}
+	entry, ok := registry.FindByNode(reg, candidate.ID)
+	if !ok {
+		return false
+	}
+	return entry.CanonicalBlueprintNode == candidate.ID
+}
+
+func stablePrimarySort(level string, activeDomain string, rows []nodeRecord, scored map[string]float64, reasons map[string][]string) []model.RouteCandidate {
+	ordered := append([]nodeRecord{}, rows...)
+	sort.Slice(ordered, func(i, j int) bool {
+		left := ordered[i]
+		right := ordered[j]
+
+		leftScore := scored[left.ID]
+		rightScore := scored[right.ID]
+		if leftScore != rightScore {
+			return leftScore > rightScore
+		}
+
+		leftCanonical := canonicalHit(left)
+		rightCanonical := canonicalHit(right)
+		if leftCanonical != rightCanonical {
+			return leftCanonical
+		}
+
+		leftDomainMatch := activeDomain != "" && left.Domain == activeDomain
+		rightDomainMatch := activeDomain != "" && right.Domain == activeDomain
+		if leftDomainMatch != rightDomainMatch {
+			return leftDomainMatch
+		}
+
+		leftRule := candidateRulePriority(level, left)
+		rightRule := candidateRulePriority(level, right)
+		if leftRule != rightRule {
+			return leftRule < rightRule
+		}
+
+		return left.ID < right.ID
+	})
+
+	result := make([]model.RouteCandidate, 0, len(ordered))
+	for _, row := range ordered {
+		reason := append([]string{}, reasons[row.ID]...)
+		result = append(result, buildCandidate(row, scored[row.ID], reason))
+	}
+	return result
+}
+
+func stableAttachIDs(ids []string) []string {
+	unique := make([]string, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+	sort.Strings(unique)
+	return unique
+}
+
+func dedupeAndSortIDs(values []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
+}
+
 func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targetDomain *string, selectedFiles, configFragments, contextHints []string, maxResults int) (model.RouteResult, error) {
 	if targetPack != nil {
 		reg, regErr := registry.Default()
 		if regErr == nil {
 			if entry, ok := registry.FindByName(reg, *targetPack); ok {
-				mappedNode := entry.CanonicalBlueprintNode
+				mappedNode := strings.TrimSpace(entry.CanonicalBlueprintNode)
+				if mappedNode == "" {
+					return model.RouteResult{Candidates: []model.RouteCandidate{}, MustInclude: []string{}, DecisionBasis: "target_pack>canonical_missing_hard_fail"}, nil
+				}
 				directRec, recErr := fetchNodeRecord(db, mappedNode)
 				direct, err := ReadNode(db, mappedNode, "summary")
-				if err == nil && recErr == nil && direct != nil && direct.Level == level {
-					must, _ := fetchEdges(db, direct.ID, "required_with")
-					reason := []string{"target_pack match"}
-					if targetDomain != nil {
-						reason = append(reason, fmt.Sprintf("target_domain=%s bypassed by explicit target_pack", *targetDomain))
+				if err != nil || recErr != nil || direct == nil || direct.Level != level {
+					return model.RouteResult{Candidates: []model.RouteCandidate{}, MustInclude: []string{}, DecisionBasis: "target_pack>canonical_missing_hard_fail"}, nil
+				}
+
+				must := []string{}
+				must, _ = fetchEdges(db, direct.ID, "required_with")
+				if profile, ok := profileForNode(direct.ID); ok {
+					reg, err := registry.Default()
+					if err == nil {
+						for _, packName := range profile.RequiredPacks {
+							if requiredEntry, found := registry.FindByName(reg, packName); found {
+								must = append(must, requiredEntry.CanonicalBlueprintNode)
+							}
+						}
 					}
-					return model.RouteResult{
-						Candidates: []model.RouteCandidate{{
-							ID:              direct.ID,
-							Title:           direct.Title,
-							Summary:         direct.Summary,
-							Score:           99.0,
-							Reason:          reason,
-							NodeKind:        directRec.NodeKind,
-							VisibilityScope: directRec.VisibilityScope,
-							ActivationMode:  directRec.ActivationMode,
-						}},
-						MustInclude: must,
-					}, nil
+				}
+
+				reason := []string{"target_pack match"}
+				if targetDomain != nil {
+					reason = append(reason, "target_domain ignored due to explicit target_pack")
 				}
 				return model.RouteResult{
 					Candidates: []model.RouteCandidate{{
-						ID:              entry.CanonicalBlueprintNode,
-						Title:           entry.Name,
-						Summary:         entry.Category,
+						ID:              direct.ID,
+						Title:           direct.Title,
+						Summary:         direct.Summary,
 						Score:           99.0,
-						Reason:          []string{"target_pack match", "registry fallback"},
-						VisibilityScope: entry.VisibilityScope,
-						ActivationMode:  entry.ActivationMode,
+						Reason:          reason,
+						NodeKind:        directRec.NodeKind,
+						VisibilityScope: directRec.VisibilityScope,
+						ActivationMode:  directRec.ActivationMode,
 					}},
-					MustInclude: []string{},
+					MustInclude:   dedupeAndSortIDs(must),
+					DecisionBasis: "target_pack>canonical_exact",
 				}, nil
 			}
 		}
@@ -333,11 +442,36 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 		activeDomain = inferMainDomain(task, selectedFiles, configFragments, contextHints)
 	}
 
-	globalCandidates := make([]model.RouteCandidate, 0)
-	workflowCandidates := make([]model.RouteCandidate, 0)
+	globalPool := make([]nodeRecord, 0)
+	workflowPool := make([]nodeRecord, 0)
 	attachIDs := make([]string, 0)
 
 	for _, row := range nodes {
+		if level == "L0" {
+			if domainNodeAllowedInGlobal(row) {
+				globalPool = append(globalPool, row)
+			}
+			continue
+		}
+		if level == "L1" {
+			if workflowNodeAllowedInDomain(row, activeDomain) {
+				workflowPool = append(workflowPool, row)
+				continue
+			}
+			if capabilityAttachAllowed(row, activeDomain) {
+				attachIDs = append(attachIDs, row.ID)
+			}
+		}
+	}
+
+	scorePool := globalPool
+	if level == "L1" {
+		scorePool = workflowPool
+	}
+
+	scored := map[string]float64{}
+	reasons := map[string][]string{}
+	for _, row := range scorePool {
 		meta, err := fetchMeta(db, row.ID)
 		if err != nil {
 			return model.RouteResult{}, err
@@ -357,43 +491,28 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 		if score <= 0 {
 			continue
 		}
-
-		if level == "L0" && domainNodeAllowedInGlobal(row) {
+		if level == "L0" {
 			reason = append(reason, "global_candidate_space")
-			globalCandidates = append(globalCandidates, buildCandidate(row, score, reason))
-			continue
-		}
-		if level == "L1" && workflowNodeAllowedInDomain(row, activeDomain) {
+		} else {
 			reason = append(reason, "domain_candidate_space")
-			workflowCandidates = append(workflowCandidates, buildCandidate(row, score, reason))
-			continue
 		}
-		if level == "L1" && capabilityAttachAllowed(row, activeDomain) {
-			attachIDs = append(attachIDs, row.ID)
-		}
+		scored[row.ID] = score
+		reasons[row.ID] = reason
 	}
 
-	sort.Slice(globalCandidates, func(i, j int) bool {
-		if globalCandidates[i].Score == globalCandidates[j].Score {
-			return globalCandidates[i].ID < globalCandidates[j].ID
+	filteredRows := make([]nodeRecord, 0, len(scorePool))
+	for _, row := range scorePool {
+		if _, ok := scored[row.ID]; ok {
+			filteredRows = append(filteredRows, row)
 		}
-		return globalCandidates[i].Score > globalCandidates[j].Score
-	})
-	sort.Slice(workflowCandidates, func(i, j int) bool {
-		if workflowCandidates[i].Score == workflowCandidates[j].Score {
-			return workflowCandidates[i].ID < workflowCandidates[j].ID
-		}
-		return workflowCandidates[i].Score > workflowCandidates[j].Score
-	})
+	}
+	selected := stablePrimarySort(level, activeDomain, filteredRows, scored, reasons)
+	attachIDs = stableAttachIDs(attachIDs)
 
 	if maxResults <= 0 {
 		maxResults = 3
 	}
 
-	selected := workflowCandidates
-	if level == "L0" {
-		selected = globalCandidates
-	}
 	if len(selected) > maxResults {
 		selected = selected[:maxResults]
 	}
@@ -411,24 +530,14 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 				}
 			}
 		}
-		seen := map[string]bool{}
-		merged := make([]string, 0, len(must)+len(attachIDs))
-		for _, id := range must {
-			if !seen[id] {
-				seen[id] = true
-				merged = append(merged, id)
-			}
-		}
-		for _, id := range attachIDs {
-			if !seen[id] {
-				seen[id] = true
-				merged = append(merged, id)
-			}
-		}
-		must = merged
+		must = dedupeAndSortIDs(append(must, attachIDs...))
 	}
 
-	return model.RouteResult{Candidates: selected, MustInclude: must}, nil
+	decisionBasis := "score>canonical>domain>rule>lexicographic"
+	if len(selected) == 0 {
+		decisionBasis = "candidate_space_filtered_no_primary"
+	}
+	return model.RouteResult{Candidates: selected, MustInclude: must, DecisionBasis: decisionBasis}, nil
 }
 
 func ReadNode(db *sql.DB, nodeID string, section string) (*model.NodeSummary, error) {
