@@ -680,6 +680,8 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		Required:              []model.NodeSummary{},
 		ExecutionChildren:     []model.NodeSummary{},
 		Deferred:              []model.NodeSummary{},
+		IncludedDecisions:     []model.ContractDecision{},
+		ExcludedDecisions:     []model.ContractDecision{},
 		RequiredPacks:         []string{},
 		RecommendedValidators: []string{},
 		RecommendedArtifacts:  []string{},
@@ -693,13 +695,40 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		return bundle, nil
 	}
 	bundle.Main = main
+	bundle.IncludedDecisions = append(bundle.IncludedDecisions, model.ContractDecision{
+		NodeID:        mainNode,
+		Action:        "include",
+		ReasonCode:    "INCLUDE_PRIMARY_CONTEXT",
+		SourceRule:    "CONT-01",
+		Scope:         "target_domain",
+		DecisionBasis: "task_completable_and_explainable",
+		HumanNote:     "主上下文节点用于保证任务可完成性与规则可解释性。",
+	})
 	if profile, ok := profileForNode(mainNode); ok {
 		bundle.RequiredPacks = append(bundle.RequiredPacks, profile.RequiredPacks...)
 		bundle.RecommendedValidators = append(bundle.RecommendedValidators, profile.RecommendedValidators...)
 		bundle.RecommendedArtifacts = append(bundle.RecommendedArtifacts, profile.RecommendedArtifacts...)
 	}
 
-	appendNode := func(targetID string, collection *[]model.NodeSummary) error {
+	mainRecord, err := fetchNodeRecord(db, mainNode)
+	if err != nil {
+		return bundle, err
+	}
+	legalAttachSet := map[string]bool{}
+	for _, packName := range bundle.RequiredPacks {
+		reg, regErr := registry.Default()
+		if regErr != nil {
+			continue
+		}
+		if entry, ok := registry.FindByName(reg, packName); ok {
+			if strings.TrimSpace(entry.CanonicalBlueprintNode) != "" {
+				legalAttachSet[entry.CanonicalBlueprintNode] = true
+			}
+		}
+	}
+
+	includedSet := map[string]bool{mainNode: true}
+	appendNode := func(targetID string, collection *[]model.NodeSummary, reasonCode, sourceRule, scope, decisionBasis, humanNote string) error {
 		node, err := ReadNode(db, targetID, "summary")
 		if err != nil {
 			return err
@@ -707,6 +736,16 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		if node == nil {
 			return nil
 		}
+		includedSet[targetID] = true
+		bundle.IncludedDecisions = append(bundle.IncludedDecisions, model.ContractDecision{
+			NodeID:        targetID,
+			Action:        "include",
+			ReasonCode:    reasonCode,
+			SourceRule:    sourceRule,
+			Scope:         scope,
+			DecisionBasis: decisionBasis,
+			HumanNote:     humanNote,
+		})
 		if node.Level == "L3" {
 			bundle.Deferred = append(bundle.Deferred, *node)
 			return nil
@@ -721,7 +760,8 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 			return bundle, err
 		}
 		for _, t := range targets {
-			if err := appendNode(t, &bundle.Required); err != nil {
+			legalAttachSet[t] = true
+			if err := appendNode(t, &bundle.Required, "INCLUDE_REQUIRED_WITH", "BR-05B", "target_domain", "task_completable_and_explainable", "required_with 节点用于保证主任务闭环与约束完整。"); err != nil {
 				return bundle, err
 			}
 		}
@@ -733,7 +773,7 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 			return bundle, err
 		}
 		for _, t := range targets {
-			if err := appendNode(t, &bundle.ExecutionChildren); err != nil {
+			if err := appendNode(t, &bundle.ExecutionChildren, "INCLUDE_COMPLETENESS_RELAXATION", "CONT-02", "target_domain", "completeness_over_minimality", "为覆盖执行子步骤，放宽最小化并保留完整性。 "); err != nil {
 				return bundle, err
 			}
 		}
@@ -745,13 +785,53 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 			return bundle, err
 		}
 		for _, t := range targets {
-			if err := appendNode(t, &bundle.ExecutionChildren); err != nil {
+			if err := appendNode(t, &bundle.ExecutionChildren, "INCLUDE_COMPLETENESS_RELAXATION", "CONT-02", "target_domain", "completeness_over_minimality", "为避免遗漏常见失败场景，放宽最小化并纳入候选补充上下文。 "); err != nil {
 				return bundle, err
 			}
 		}
 	}
 
+	nodesAtL1, err := fetchNodes(db, ptrString("L1"))
+	if err != nil {
+		return bundle, err
+	}
+	for _, candidate := range nodesAtL1 {
+		inTargetDomain := candidate.Domain == mainRecord.Domain && candidate.ActivationMode != "attach-only"
+		isLegalAttach := legalAttachSet[candidate.ID] && candidate.ActivationMode == "attach-only"
+		if !inTargetDomain && !isLegalAttach {
+			continue
+		}
+		if includedSet[candidate.ID] {
+			continue
+		}
+		reasonCode := "EXCLUDE_MINIMALITY_BOUNDARY"
+		sourceRule := "BR-05A"
+		scope := "target_domain"
+		decisionBasis := "minimality_guard"
+		humanNote := "候选节点不影响当前闭环，按最小上下文契约排除。"
+		if isLegalAttach {
+			reasonCode = "EXCLUDE_ATTACH_NOT_REQUIRED"
+			sourceRule = "BR-03"
+			scope = "attach_only_capability"
+			decisionBasis = "attach_only_not_required"
+			humanNote = "attach-only capability 在当前任务未形成硬性依赖，故不默认交付。"
+		}
+		bundle.ExcludedDecisions = append(bundle.ExcludedDecisions, model.ContractDecision{
+			NodeID:        candidate.ID,
+			Action:        "exclude",
+			ReasonCode:    reasonCode,
+			SourceRule:    sourceRule,
+			Scope:         scope,
+			DecisionBasis: decisionBasis,
+			HumanNote:     humanNote,
+		})
+	}
+
 	return bundle, nil
+}
+
+func ptrString(v string) *string {
+	return &v
 }
 
 func ExpandNode(db *sql.DB, nodeID, edgeType string) ([]string, error) {
