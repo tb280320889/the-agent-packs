@@ -13,6 +13,7 @@ type BoundedContextSnapshot struct {
 type ExecutionInput struct {
 	Task             string
 	MainPack         string
+	ContractBundle   *model.ContextBundle
 	Artifacts        []model.Artifact
 	RequiredPacks    []string
 	BoundedContext   BoundedContextSnapshot

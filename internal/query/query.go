@@ -761,7 +761,23 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		}
 		for _, t := range targets {
 			legalAttachSet[t] = true
-			if err := appendNode(t, &bundle.Required, "INCLUDE_REQUIRED_WITH", "BR-05B", "target_domain", "task_completable_and_explainable", "required_with 节点用于保证主任务闭环与约束完整。"); err != nil {
+			reasonCode := "INCLUDE_REQUIRED_WITH"
+			sourceRule := "BR-05B"
+			scope := "target_domain"
+			decisionBasis := "task_completable_and_explainable"
+			humanNote := "required_with 节点用于保证主任务闭环与约束完整。"
+			record, recErr := fetchNodeRecord(db, t)
+			if recErr != nil {
+				return bundle, recErr
+			}
+			if record.ActivationMode == "attach-only" && record.Domain != mainRecord.Domain {
+				reasonCode = "INCLUDE_ATTACH_REQUIRED"
+				sourceRule = "BR-03"
+				scope = "attach_only_capability"
+				decisionBasis = "attach_only_required_for_completeness"
+				humanNote = "attach-only capability 被 required_with 引用，作为必要依赖纳入交付。"
+			}
+			if err := appendNode(t, &bundle.Required, reasonCode, sourceRule, scope, decisionBasis, humanNote); err != nil {
 				return bundle, err
 			}
 		}

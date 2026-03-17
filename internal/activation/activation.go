@@ -284,10 +284,11 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 
 	plan := buildValidationPlan(req, mainPack, artifacts, append([]string{}, bundle.RecommendedValidators...))
 	vInput := validator.ExecutionInput{
-		Task:          req.Task,
-		MainPack:      mainPack,
-		Artifacts:     artifacts,
-		RequiredPacks: append([]string{}, bundle.RequiredPacks...),
+		Task:           req.Task,
+		MainPack:       mainPack,
+		ContractBundle: &bundle,
+		Artifacts:      artifacts,
+		RequiredPacks:  append([]string{}, bundle.RequiredPacks...),
 		BoundedContext: validator.BoundedContextSnapshot{
 			SelectedFiles:   req.BoundedContext.SelectedFiles,
 			ConfigFragments: req.BoundedContext.ConfigFragments,
