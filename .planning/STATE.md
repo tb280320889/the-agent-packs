@@ -22,7 +22,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [█████████░] 86%
+- **Progress:** [█████████░] 88%
 - **Current Plan:** Not started
 - **Total Plans in Phase:** 3
 - Current Phase: 01
@@ -34,6 +34,8 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 01]: 编译结果统一返回 CompileResult(errors) 以便 CLI/MCP 与测试消费
 - [Phase 01]: 索引重建先写临时 DB，再在报告成功后原子替换目标索引
 - [Phase 01]: 解析回归测试采用固定 fixture 覆盖多行 frontmatter 与未知字段
+- [Phase 01]: Compile 仅在 writeReports 成功后执行索引原子替换，失败路径不触碰旧索引
+- [Phase 01]: 索引回归测试以旧索引可查询和内容稳定为失败路径真值
 
 ## Performance Metrics
 
@@ -42,11 +44,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | 01 | 01 | 20 min | 2 | 5 | 2026-03-16T12:33:41Z |
 | 01 | 02 | 3 min | 3 | 9 | 2026-03-16T13:32:33Z |
 | Phase 01 P03 | 8 min | 2 tasks | 4 files |
+| Phase 01 P04 | 8 min | 2 tasks | 3 files |
 
 ## Session
 
-- **Last session:** 2026-03-16T14:16:46.426Z
-- **Stopped At:** Completed 01-03-PLAN.md
+- **Last session:** 2026-03-17T00:01:35.315Z
+- **Stopped At:** Completed 01-04-PLAN.md
 - **Resume file:** None
 
 ## Roadmap Snapshot
