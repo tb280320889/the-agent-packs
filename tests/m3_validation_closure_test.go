@@ -105,6 +105,12 @@ func TestM3NegativeWrongTargetPackNotOverriddenByHint(t *testing.T) {
 	if result.DecisionBasis != "target_pack>canonical_exact" {
 		t.Fatalf("expected target_pack decision basis, got %s", result.DecisionBasis)
 	}
+	if result.Candidates[0].ReasonCode != "TARGET_PACK_EXACT" {
+		t.Fatalf("expected target_pack reason code, got %s", result.Candidates[0].ReasonCode)
+	}
+	if result.Candidates[0].RuleRef != "BR-04" {
+		t.Fatalf("expected BR-04 rule ref, got %s", result.Candidates[0].RuleRef)
+	}
 }
 
 func TestRouteTargetPackCanonicalUnavailableAtLevelReturnsNoPrimaryCandidate(t *testing.T) {
@@ -119,6 +125,18 @@ func TestRouteTargetPackCanonicalUnavailableAtLevelReturnsNoPrimaryCandidate(t *
 	}
 	if len(result.Candidates) != 0 {
 		t.Fatalf("expected no candidates when canonical mapping is unavailable for level, got %+v", result.Candidates)
+	}
+	if result.Status != "failed" {
+		t.Fatalf("expected failed status when canonical missing, got %s", result.Status)
+	}
+	if result.ErrorCode != "ROUTE_CANONICAL_MISSING" {
+		t.Fatalf("expected ROUTE_CANONICAL_MISSING, got %s", result.ErrorCode)
+	}
+	if result.NextAction != "检查 registry canonical 映射" {
+		t.Fatalf("unexpected next action: %s", result.NextAction)
+	}
+	if result.DocsRef != "" {
+		t.Fatalf("expected empty docs_ref placeholder, got %q", result.DocsRef)
 	}
 	if result.DecisionBasis != "target_pack>canonical_missing_hard_fail" {
 		t.Fatalf("unexpected decision basis for unresolved target pack: %s", result.DecisionBasis)
@@ -167,6 +185,15 @@ func TestM3PartialWhenContextInsufficient(t *testing.T) {
 	}
 	if result.Status != "partial" {
 		t.Fatalf("expected partial, got %s", result.Status)
+	}
+	if result.RouteStatus != "completed" {
+		t.Fatalf("expected route status completed, got %s", result.RouteStatus)
+	}
+	if result.RouteErrorCode != "" {
+		t.Fatalf("expected empty route error code, got %s", result.RouteErrorCode)
+	}
+	if result.RouteDocsRef != "" {
+		t.Fatalf("expected empty route docs_ref placeholder, got %q", result.RouteDocsRef)
 	}
 }
 

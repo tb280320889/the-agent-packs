@@ -91,8 +91,20 @@ func TestRouteTargetPackHasHighestPriority(t *testing.T) {
 	if len(result.Candidates) == 0 {
 		t.Fatalf("expected candidates")
 	}
+	if result.Status != "completed" {
+		t.Fatalf("expected completed status, got %s", result.Status)
+	}
 	if result.Candidates[0].ID != "L1.security.permissions" {
 		t.Fatalf("unexpected candidate: %s", result.Candidates[0].ID)
+	}
+	if result.Candidates[0].ReasonCode != "TARGET_PACK_EXACT" {
+		t.Fatalf("expected reason code TARGET_PACK_EXACT, got %s", result.Candidates[0].ReasonCode)
+	}
+	if result.Candidates[0].RuleRef != "BR-04" {
+		t.Fatalf("expected rule ref BR-04, got %s", result.Candidates[0].RuleRef)
+	}
+	if result.Candidates[0].DocsRef != "" {
+		t.Fatalf("expected empty docs_ref placeholder, got %q", result.Candidates[0].DocsRef)
 	}
 	if result.Candidates[0].ActivationMode != "attach-only" {
 		t.Fatalf("expected attach-only candidate metadata, got %+v", result.Candidates[0])
@@ -109,6 +121,9 @@ func TestRouteTargetPackHasHighestPriority(t *testing.T) {
 	}
 	if result.DecisionBasis != "target_pack>canonical_exact" {
 		t.Fatalf("unexpected decision basis: %s", result.DecisionBasis)
+	}
+	if result.DecisionTraceID == "" {
+		t.Fatalf("decision trace id should not be empty")
 	}
 }
 
@@ -214,6 +229,23 @@ func TestRouteDomainCompetitionExcludesAttachOnlyCapability(t *testing.T) {
 	}
 	if result.DecisionBasis != "score>canonical>domain>rule>lexicographic" {
 		t.Fatalf("unexpected decision basis for L1: %s", result.DecisionBasis)
+	}
+	if len(result.CapabilityDecisions) == 0 {
+		t.Fatalf("expected capability decisions for attach-only packages")
+	}
+	for _, decision := range result.CapabilityDecisions {
+		if !decision.Attached {
+			t.Fatalf("expected attached capability decision, got %+v", decision)
+		}
+		if decision.ReasonCode != "CAPABILITY_ATTACHED" {
+			t.Fatalf("unexpected capability reason code: %s", decision.ReasonCode)
+		}
+		if decision.RuleRef != "BR-03" {
+			t.Fatalf("unexpected capability rule ref: %s", decision.RuleRef)
+		}
+		if decision.DocsRef != "" {
+			t.Fatalf("expected empty docs_ref placeholder, got %q", decision.DocsRef)
+		}
 	}
 }
 
@@ -358,6 +390,18 @@ func TestActivationPartialWhenDomainKnownButNoCandidate(t *testing.T) {
 	}
 	if result.Status != "partial" {
 		t.Fatalf("expected partial, got %s", result.Status)
+	}
+	if result.RouteStatus != "completed" {
+		t.Fatalf("expected route status completed, got %s", result.RouteStatus)
+	}
+	if result.RouteErrorCode != "" {
+		t.Fatalf("expected empty route error code, got %s", result.RouteErrorCode)
+	}
+	if result.RouteNextAction != "" {
+		t.Fatalf("expected empty route next action, got %s", result.RouteNextAction)
+	}
+	if result.RouteDocsRef != "" {
+		t.Fatalf("expected empty route docs_ref placeholder, got %q", result.RouteDocsRef)
 	}
 }
 
