@@ -1,6 +1,7 @@
 package query
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,12 @@ type packProfile struct {
 	RequiredPacks         []string
 	RecommendedValidators []string
 	RecommendedArtifacts  []string
+}
+
+type ValidatorManifest struct {
+	Validators []string
+	Sources    map[string][]string
+	Signature  string
 }
 
 type nodeRecord struct {
@@ -69,6 +76,79 @@ func profileForNode(nodeID string) (packProfile, bool) {
 		RecommendedValidators: append([]string{}, entry.RecommendedValidators...),
 		RecommendedArtifacts:  append([]string{}, entry.RecommendedArtifacts...),
 	}, true
+}
+
+func RecommendedValidators(mainPack string, requiredPacks []string) ValidatorManifest {
+	manifest := ValidatorManifest{
+		Validators: []string{"validator-core-output"},
+		Sources:    map[string][]string{"validator-core-output": {"registry-core-default"}},
+	}
+
+	reg, err := registry.Default()
+	if err != nil {
+		manifest.Signature = validatorManifestSignature(manifest.Validators)
+		return manifest
+	}
+
+	packScope := make([]string, 0, len(requiredPacks)+1)
+	if strings.TrimSpace(mainPack) != "" {
+		packScope = append(packScope, mainPack)
+	}
+	packScope = append(packScope, requiredPacks...)
+	if entry, ok := registry.FindByName(reg, mainPack); ok {
+		packScope = append(packScope, entry.RequiredPacks...)
+	}
+
+	seenPacks := map[string]bool{}
+	seenValidators := map[string]bool{"validator-core-output": true}
+
+	for _, packName := range packScope {
+		packName = strings.TrimSpace(packName)
+		if packName == "" || seenPacks[packName] {
+			continue
+		}
+		seenPacks[packName] = true
+
+		entry, ok := registry.FindByName(reg, packName)
+		if !ok {
+			continue
+		}
+
+		for _, validatorName := range entry.RecommendedValidators {
+			validatorName = strings.TrimSpace(validatorName)
+			if validatorName == "" {
+				continue
+			}
+			if !seenValidators[validatorName] {
+				manifest.Validators = append(manifest.Validators, validatorName)
+				seenValidators[validatorName] = true
+			}
+			manifest.Sources[validatorName] = append(manifest.Sources[validatorName], packName)
+		}
+	}
+
+	rest := make([]string, 0, len(manifest.Validators))
+	for _, validatorName := range manifest.Validators {
+		if validatorName == "validator-core-output" {
+			continue
+		}
+		rest = append(rest, validatorName)
+	}
+	sort.Strings(rest)
+	manifest.Validators = append([]string{"validator-core-output"}, rest...)
+
+	for validatorName, sources := range manifest.Sources {
+		manifest.Sources[validatorName] = dedupeAndSortIDs(sources)
+	}
+
+	manifest.Signature = validatorManifestSignature(manifest.Validators)
+	return manifest
+}
+
+func validatorManifestSignature(validators []string) string {
+	joined := strings.Join(validators, ",")
+	digest := sha256.Sum256([]byte(joined))
+	return fmt.Sprintf("sha256:%x", digest)
 }
 
 func OpenDB(dbPath string) (*sql.DB, error) {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ type requestShape struct {
 	PlanID          string          `json:"plan_id"`
 	TriggerKind     string          `json:"validation_trigger_kind"`
 	TriggerReason   string          `json:"validation_trigger_reason"`
+	ManualRerun     bool            `json:"validation_manual_rerun"`
 	TargetPack      *string         `json:"target_pack"`
 	TargetDomain    *string         `json:"target_domain"`
 	BoundedContext  *boundedContext `json:"bounded_context"`
@@ -56,20 +58,51 @@ func ptr(s string) *string {
 	return &v
 }
 
-func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.Artifact, bundleValidators []string) model.ValidationPlan {
-	if len(bundleValidators) == 0 {
-		bundleValidators = []string{"validator-core-output"}
+func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.Artifact, requiredPacks []string, bundleValidators []string) model.ValidationPlan {
+	profile := query.RecommendedValidators(mainPack, requiredPacks)
+	validatorSet := map[string]bool{}
+	validatorNames := make([]string, 0, len(profile.Validators)+len(bundleValidators)+1)
+	appendValidator := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || validatorSet[name] {
+			return
+		}
+		validatorSet[name] = true
+		validatorNames = append(validatorNames, name)
 	}
-	validators := make([]model.ValidatorPlan, 0, len(bundleValidators))
+	appendValidator("validator-core-output")
+	for _, name := range profile.Validators {
+		appendValidator(name)
+	}
 	for _, name := range bundleValidators {
-		scope := "artifact"
-		reason := "All output artifacts must satisfy envelope completeness."
-		if name != "validator-core-output" {
+		appendValidator(name)
+	}
+	rest := make([]string, 0, len(validatorNames))
+	for _, name := range validatorNames {
+		if name == "validator-core-output" {
+			continue
+		}
+		rest = append(rest, name)
+	}
+	sort.Strings(rest)
+	validatorNames = append([]string{"validator-core-output"}, rest...)
+
+	validators := make([]model.ValidatorPlan, 0, len(validatorNames))
+	for _, name := range validatorNames {
+		scope := "domain"
+		reason := "Registry declared validator for core output integrity."
+		if name == "validator-core-output" {
+			scope = "artifact"
+		}
+		if strings.HasPrefix(name, "validator-domain-") || strings.HasPrefix(name, "validator-contract-") {
 			scope = "domain"
-			reason = "Domain validator must verify workflow-specific runtime constraints."
+			reason = fmt.Sprintf("Registry declared validator for %s", strings.TrimPrefix(name, "validator-domain-"))
+		}
+		if src := profile.Sources[name]; len(src) > 0 && name != "validator-core-output" {
+			reason = fmt.Sprintf("Registry declared validator for %s", strings.Join(src, "+"))
 		}
 		if name == "validator-domain-wxt-manifest" {
-			reason = "Manifest review must cover permission and store-facing risks."
+			reason = "Registry declared validator for wxt-manifest"
 		}
 		validators = append(validators, model.ValidatorPlan{Name: name, Scope: scope, Reason: reason})
 	}
@@ -87,7 +120,7 @@ func buildValidationPlan(req *requestShape, mainPack string, artifacts []model.A
 			"warn":  "allow_partial",
 			"error": "block_completed",
 		},
-		PlanReason: "Run core and domain validators for routed workflow package output.",
+		PlanReason: fmt.Sprintf("registry-defined plan for core+domain validators (signature=%s)", profile.Signature),
 	}
 }
 
@@ -145,26 +178,55 @@ func hasWarnFindings(results []model.ValidatorResult) bool {
 	return false
 }
 
-func deriveStatus(requestInvalid bool, routeMissing bool, contextInsufficient bool, handoff map[string]any, plan model.ValidationPlan, results []model.ValidatorResult) string {
+func deriveStatuses(requestInvalid bool, routeMissing bool, plan model.ValidationPlan, results []model.ValidatorResult) (string, string) {
 	if requestInvalid {
-		return "failed"
+		return "failed", "failed"
 	}
 	if routeMissing {
-		return "failed"
+		return "failed", "failed"
 	}
 	if hasBlockingFailure(plan.SeverityPolicy, results) {
-		return "failed"
-	}
-	if len(handoff) > 0 {
-		return "handoff"
-	}
-	if contextInsufficient {
-		return "partial"
+		return "failed", "failed"
 	}
 	if hasWarnFindings(results) && plan.SeverityPolicy["warn"] == "allow_partial" {
-		return "partial"
+		return "partial", "warned"
 	}
-	return "completed"
+	return "completed", "passed"
+}
+
+func resolveTrigger(req *requestShape) (string, string) {
+	if req.ManualRerun {
+		return "manual_rerun", "manual validation rerun requested"
+	}
+	kind := strings.TrimSpace(req.TriggerKind)
+	if kind == "" {
+		kind = "milestone_auto"
+	}
+	reason := strings.TrimSpace(req.TriggerReason)
+	if reason == "" {
+		switch kind {
+		case "rule_change_auto":
+			reason = "auto-triggered by rule change"
+		case "validator_manifest_change_auto":
+			reason = "auto-triggered by validator manifest change"
+		case "manual_rerun":
+			reason = "manual validation rerun requested"
+		default:
+			kind = "milestone_auto"
+			reason = "auto-triggered by milestone validation"
+		}
+	}
+	allowed := map[string]bool{
+		"milestone_auto":                 true,
+		"rule_change_auto":               true,
+		"validator_manifest_change_auto": true,
+		"manual_rerun":                   true,
+	}
+	if !allowed[kind] {
+		kind = "milestone_auto"
+		reason = "auto-triggered by milestone validation"
+	}
+	return kind, reason
 }
 
 func mergeHints(primary, secondary []string) []string {
@@ -387,14 +449,15 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	handoff := buildHandoff(mainPack, req.Task, bundle.RequiredPacks, artifacts)
 	contextInsufficient := len(req.BoundedContext.SelectedFiles) == 0 && len(req.BoundedContext.ConfigFragments) == 0
 
-	plan := buildValidationPlan(req, mainPack, artifacts, append([]string{}, bundle.RecommendedValidators...))
+	plan := buildValidationPlan(req, mainPack, artifacts, append([]string{}, bundle.RequiredPacks...), append([]string{}, bundle.RecommendedValidators...))
+	triggerKind, triggerReason := resolveTrigger(req)
 	vInput := validator.ExecutionInput{
 		Task:           req.Task,
 		MainPack:       mainPack,
 		PhaseID:        fallbackOrDefault(req.PhaseID, "04"),
 		PlanID:         fallbackOrDefault(req.PlanID, "unknown"),
-		TriggerKind:    fallbackOrDefault(req.TriggerKind, "milestone_auto"),
-		TriggerReason:  fallbackOrDefault(req.TriggerReason, "plan_milestone_validation"),
+		TriggerKind:    triggerKind,
+		TriggerReason:  triggerReason,
 		ContractBundle: &bundle,
 		Artifacts:      artifacts,
 		RequiredPacks:  append([]string{}, bundle.RequiredPacks...),
@@ -405,21 +468,21 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 			BrowserHints:    req.BoundedContext.BrowserHints,
 			ContextHints:    req.ContextHints,
 		},
-		RequestedHandoff: len(handoff) > 0,
+		RequestedHandoff: strings.Contains(strings.ToLower(req.Task), "handoff"),
 		Handoff:          handoff,
 	}
 	validatorResults := validator.Run(plan, vInput)
-	status := deriveStatus(false, false, contextInsufficient, handoff, plan, validatorResults)
+	status, machineStatus := deriveStatuses(false, false, plan, validatorResults)
 	runID := fmt.Sprintf("%s:validation:%d", req.RequestID, time.Now().Unix())
 	errorCodes, ruleCodes, repairSuggestions := collectCodesAndSuggestions(validatorResults)
 	evidenceRefs := buildEvidenceRefs(req.RequestID, runID, vInput.Artifacts, handoff)
-	humanSummary := fmt.Sprintf("本次校验结论为 %s，已生成 %d 条证据引用并可追溯到运行账本。", status, len(evidenceRefs))
+	humanSummary := fmt.Sprintf("本次校验结论为 %s，已生成 %d 条证据引用并可追溯到运行账本。", machineStatus, len(evidenceRefs))
 	nextActions := []string{"如存在 error 级别问题，请先修复后再触发下一次 validation。"}
-	if status == "completed" {
+	if machineStatus == "passed" {
 		nextActions = []string{"当前校验通过，可继续后续计划执行。"}
 	}
-	if status == "handoff" {
-		nextActions = []string{"请按 handoff 指引继续跨包协作并保留 run_id 追踪。"}
+	if machineStatus == "warned" {
+		nextActions = []string{fmt.Sprintf("记录 warned 处理意见并链接 run_id=%s", runID)}
 	}
 
 	currentValidation := model.ValidationEnvelope{
@@ -432,7 +495,7 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		InputDigest:        makeInputDigest(req, vInput.Artifacts),
 		EvidenceRefs:       evidenceRefs,
 		MachineView: model.ValidationMachineView{
-			Status:            status,
+			Status:            machineStatus,
 			ErrorCodes:        errorCodes,
 			RuleCodes:         ruleCodes,
 			Trigger:           vInput.TriggerKind,
@@ -450,7 +513,7 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	if contextInsufficient {
 		summary = "bounded context missing required evidence"
 	}
-	if len(handoff) > 0 {
+	if len(handoff) > 0 && status == "completed" {
 		summary = "handoff requested by task boundary"
 	}
 	if len(bundle.RecommendedValidators) == 0 && len(bundle.RecommendedArtifacts) == 0 {
