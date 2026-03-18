@@ -3,7 +3,23 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_plan: 3
-status: unknown
+status: verifying
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-18T08:44:35.101Z"
+progress:
+  total_phases: 6
+  completed_phases: 5
+  total_plans: 18
+  completed_plans: 17
+  percent: 94
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_plan: 3
+status: Phase complete — ready for verification
 stopped_at: Completed 04-04-PLAN.md
 last_updated: "2026-03-18T06:33:35.417Z"
 progress:
@@ -74,6 +90,10 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 04]: batch_finalize 延后补记默认 24h deadline，超窗升级 RiskEscalated 并输出 runtime-ledger-overdue。
 - [Phase 04]: record_type 映射规则固定为 validation 必含，change/decision/assumption 按触发条件增量追加并按固定顺序输出。
 - [Phase 04]: runtime ledger 版本链仍以 TraceID+RecordType 为粒度追加，避免多类型写入后版本串线。
+- [Phase 05]: 第二主域采用 monorepo-oss-governance 单子域闭环接入，保持 attach-only 能力线不迁移。
+- [Phase 05]: 通过 DOMAIN_MONOREPO_ENABLED 控制 monorepo 域候选空间，默认开启并支持一键回退。
+- [Phase 05]: DOMN-02 固化为 WXT 三件套加 conflict anti-steal 回归矩阵。
+- [Phase 05]: handoff 状态兼容仅在无 phase/plan 标记请求生效，避免影响治理态 completed 语义。
 
 ## Performance Metrics
 
@@ -91,11 +111,13 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | Phase 04 P02 | 5 min | 3 tasks | 4 files |
 | Phase 04 P03 | 3 min | 3 tasks | 8 files |
 | Phase 04 P04 | 29 min | 2 tasks | 3 files |
+| Phase 05 P01 | 6 min | 2 tasks | 8 files |
+| Phase 05 P02 | 6 min | 2 tasks | 4 files |
 
 ## Session
 
-- **Last session:** 2026-03-18T06:33:35.412Z
-- **Stopped At:** Completed 04-04-PLAN.md
+- **Last session:** 2026-03-18T08:44:35.098Z
+- **Stopped At:** Completed 05-02-PLAN.md
 - **Resume file:** None
 
 ## Roadmap Snapshot

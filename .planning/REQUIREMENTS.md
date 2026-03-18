@@ -35,8 +35,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Domain Expansion Readiness
 
-- [ ] **DOMN-01**: Maintainer can onboard a second primary domain using existing routing and registry governance rules
-- [ ] **DOMN-02**: Maintainer can prove second-domain onboarding does not break WXT sample contract
+- [x] **DOMN-01**: Maintainer can onboard a second primary domain using existing routing and registry governance rules
+- [x] **DOMN-02**: Maintainer can prove second-domain onboarding does not break WXT sample contract
 
 ## v2 Requirements
 
@@ -80,8 +80,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VALD-01 | Phase 4 | Complete |
 | VALD-02 | Phase 4 | Complete |
 | GOVR-01 | Phase 4 | Complete |
-| DOMN-01 | Phase 5 | Pending |
-| DOMN-02 | Phase 5 | Pending |
+| DOMN-01 | Phase 5 | Complete |
+| DOMN-02 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 16 total
