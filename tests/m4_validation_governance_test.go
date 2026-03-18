@@ -5,10 +5,111 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"the-agent-packs/internal/activation"
 	"the-agent-packs/internal/model"
 )
+
+func TestM4RuntimeLedgerVersionAppendOnly(t *testing.T) {
+	traceID := "runtime-ledger:req-append:04:03"
+	firstTS := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
+	entries, firstCurrent, mode := activation.BuildRuntimeLedgerEntries(nil, activation.RuntimeLedgerBuildInput{
+		TraceID:       traceID,
+		RunID:         "req-append:validation:1",
+		TriggerKind:   model.ValidationTriggerRuleChangeAuto,
+		MachineStatus: model.ValidationStatusFailed,
+		Timestamp:     firstTS,
+		SourceRefs:    []string{"docs/AIDP/runtime/02-决策日志.md"},
+		Finalized:     false,
+	})
+	if mode != activation.LedgerWriteModeImmediate {
+		t.Fatalf("expected immediate mode, got %s", mode)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 ledger entry, got %d", len(entries))
+	}
+	if !entries[0].IsCurrent || entries[0].Version != 1 {
+		t.Fatalf("expected first entry current v1, got %+v", entries[0])
+	}
+	if firstCurrent.RunID != "req-append:validation:1" {
+		t.Fatalf("unexpected first run id: %+v", firstCurrent)
+	}
+
+	secondTS := firstTS.Add(2 * time.Hour)
+	entries, secondCurrent, mode := activation.BuildRuntimeLedgerEntries(entries, activation.RuntimeLedgerBuildInput{
+		TraceID:       traceID,
+		RunID:         "req-append:validation:2",
+		TriggerKind:   model.ValidationTriggerMilestoneAuto,
+		MachineStatus: model.ValidationStatusPassed,
+		Timestamp:     secondTS,
+		SourceRefs:    []string{"docs/AIDP/runtime/06-验证记录.md"},
+		Finalized:     true,
+	})
+	if mode != activation.LedgerWriteModeBatchFinalize {
+		t.Fatalf("expected batch_finalize mode, got %s", mode)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 ledger entries, got %d", len(entries))
+	}
+	if entries[0].IsCurrent {
+		t.Fatalf("expected previous version IsCurrent=false, got %+v", entries[0])
+	}
+	if !entries[1].IsCurrent || entries[1].Version != 2 {
+		t.Fatalf("expected second entry current v2, got %+v", entries[1])
+	}
+	if secondCurrent.Version != 2 || secondCurrent.RunID != "req-append:validation:2" {
+		t.Fatalf("unexpected second current entry: %+v", secondCurrent)
+	}
+}
+
+func TestM4RuntimeLedgerDeferredWindowAndEscalation(t *testing.T) {
+	traceID := "runtime-ledger:req-deferred:04:03"
+	base := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
+	entries, inWindowCurrent, mode := activation.BuildRuntimeLedgerEntries(nil, activation.RuntimeLedgerBuildInput{
+		TraceID:        traceID,
+		RunID:          "req-deferred:validation:1",
+		TriggerKind:    model.ValidationTriggerMilestoneAuto,
+		MachineStatus:  model.ValidationStatusPassed,
+		Timestamp:      base,
+		SourceRefs:     []string{"docs/AIDP/runtime/01-默认假设账本.md"},
+		Finalized:      false,
+		DeferredReason: "awaiting plan finalization",
+	})
+	if mode != activation.LedgerWriteModeBatchFinalize {
+		t.Fatalf("expected batch_finalize mode, got %s", mode)
+	}
+	if inWindowCurrent.DeferredDeadline == "" {
+		t.Fatalf("expected deferred deadline, got %+v", inWindowCurrent)
+	}
+	if inWindowCurrent.RiskEscalated {
+		t.Fatalf("expected no escalation within window, got %+v", inWindowCurrent)
+	}
+	if inWindowCurrent.RunID != "req-deferred:validation:1" || inWindowCurrent.TraceID != traceID {
+		t.Fatalf("expected deferred path keep run_id/trace_id, got %+v", inWindowCurrent)
+	}
+
+	overdueTS := base.Add(25 * time.Hour)
+	entries, overdueCurrent, _ := activation.BuildRuntimeLedgerEntries(entries, activation.RuntimeLedgerBuildInput{
+		TraceID:        traceID,
+		RunID:          "req-deferred:validation:2",
+		TriggerKind:    model.ValidationTriggerMilestoneAuto,
+		MachineStatus:  model.ValidationStatusPassed,
+		Timestamp:      overdueTS,
+		SourceRefs:     []string{"docs/AIDP/runtime/06-验证记录.md"},
+		Finalized:      false,
+		DeferredReason: "still awaiting finalize",
+	})
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries after overdue append, got %d", len(entries))
+	}
+	if !overdueCurrent.RiskEscalated {
+		t.Fatalf("expected overdue escalation risk=true, got %+v", overdueCurrent)
+	}
+	if overdueCurrent.RunID != "req-deferred:validation:2" || overdueCurrent.TraceID != traceID {
+		t.Fatalf("expected overdue path keep run_id/trace_id, got %+v", overdueCurrent)
+	}
+}
 
 func TestM4ValidationTraceContractStructs(t *testing.T) {
 	envelopeType := reflect.TypeOf(model.ValidationEnvelope{})

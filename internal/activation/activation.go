@@ -43,7 +43,21 @@ type LedgerWriteMode string
 const (
 	LedgerWriteModeImmediate     LedgerWriteMode = "immediate"
 	LedgerWriteModeBatchFinalize LedgerWriteMode = "batch_finalize"
+
+	runtimeLedgerDefaultDeferredWindow = "24h"
 )
+
+func runtimeLedgerDeferredWindow() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("RUNTIME_LEDGER_DEFER_WINDOW"))
+	if raw == "" {
+		raw = runtimeLedgerDefaultDeferredWindow
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 24 * time.Hour
+	}
+	return d
+}
 
 type RuntimeLedgerBuildInput struct {
 	TraceID             string
@@ -93,6 +107,22 @@ func BuildRuntimeLedgerEntries(existing []model.RuntimeLedgerEntry, input Runtim
 	mode := resolveLedgerWriteMode(input.TriggerKind, input.MachineStatus, input.HasBlockingDecision)
 	if mode == LedgerWriteModeBatchFinalize && !input.Finalized {
 		entry.Status = "deferred"
+		reason := strings.TrimSpace(input.DeferredReason)
+		if reason == "" {
+			reason = "awaiting plan finalization"
+		}
+		entry.DeferredReason = reason
+		deadline := now.Add(runtimeLedgerDeferredWindow()).UTC()
+		entry.DeferredDeadline = deadline.Format(time.RFC3339)
+		for _, prior := range existing {
+			if prior.TraceID == traceID && prior.RecordType == entry.RecordType && prior.IsCurrent && strings.TrimSpace(prior.DeferredDeadline) != "" {
+				entry.DeferredDeadline = prior.DeferredDeadline
+				break
+			}
+		}
+		if parsed, err := time.Parse(time.RFC3339, entry.DeferredDeadline); err == nil && now.After(parsed) {
+			entry.RiskEscalated = true
+		}
 	}
 
 	updated := appendRuntimeLedgerVersion(existing, entry)
@@ -573,9 +603,13 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		Timestamp:           time.Now().UTC(),
 		SourceRefs:          []string{routeResult.DocsRef, "docs/AIDP/runtime/06-验证记录.md", "docs/AIDP/runtime/03-变更摘要.md"},
 		Finalized:           false,
+		DeferredReason:      "awaiting plan finalization runtime writeback",
 		HasBlockingDecision: status == model.ActivationStatusFailed,
 	})
-	_ = ledgerEntry
+	if ledgerEntry.RiskEscalated {
+		nextActions = append(nextActions, "runtime-ledger-overdue")
+		humanSummary = humanSummary + " runtime-ledger-overdue"
+	}
 
 	currentValidation := model.ValidationEnvelope{
 		RunID:              runID,
