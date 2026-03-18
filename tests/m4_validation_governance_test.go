@@ -177,6 +177,90 @@ func TestM4RuntimeLedgerVersionAppendOnly(t *testing.T) {
 	}
 }
 
+func TestM4RuntimeLedgerRecordTypeVersionAppendOnly(t *testing.T) {
+	assertTypeVersions := func(t *testing.T, entries []model.RuntimeLedgerEntry, recordType string, expectedLatestVersion int) {
+		t.Helper()
+		typed := make([]model.RuntimeLedgerEntry, 0)
+		for _, entry := range entries {
+			if entry.RecordType == recordType {
+				typed = append(typed, entry)
+			}
+		}
+		if len(typed) != expectedLatestVersion {
+			t.Fatalf("expected %d versions for %q, got %+v", expectedLatestVersion, recordType, typed)
+		}
+		for i, entry := range typed {
+			expectedVersion := i + 1
+			if entry.Version != expectedVersion {
+				t.Fatalf("expected %q version=%d, got %+v", recordType, expectedVersion, entry)
+			}
+			if i < len(typed)-1 && entry.IsCurrent {
+				t.Fatalf("expected previous %q versions IsCurrent=false, got %+v", recordType, entry)
+			}
+		}
+		if !typed[len(typed)-1].IsCurrent {
+			t.Fatalf("expected latest %q IsCurrent=true, got %+v", recordType, typed[len(typed)-1])
+		}
+	}
+
+	t.Run("change+validation independent append", func(t *testing.T) {
+		traceID := "runtime-ledger:req-type-version:change"
+		base := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
+
+		entries, _, _ := activation.BuildRuntimeLedgerEntries(nil, activation.RuntimeLedgerBuildInput{
+			TraceID:       traceID,
+			RunID:         "req-type-version:change:1",
+			TriggerKind:   model.ValidationTriggerRuleChangeAuto,
+			MachineStatus: model.ValidationStatusPassed,
+			Timestamp:     base,
+			SourceRefs:    []string{"docs/AIDP/runtime/03-变更摘要.md"},
+			Finalized:     true,
+		})
+		entries, _, _ = activation.BuildRuntimeLedgerEntries(entries, activation.RuntimeLedgerBuildInput{
+			TraceID:       traceID,
+			RunID:         "req-type-version:change:2",
+			TriggerKind:   model.ValidationTriggerRuleChangeAuto,
+			MachineStatus: model.ValidationStatusPassed,
+			Timestamp:     base.Add(1 * time.Hour),
+			SourceRefs:    []string{"docs/AIDP/runtime/03-变更摘要.md"},
+			Finalized:     true,
+		})
+
+		assertTypeVersions(t, entries, "change", 2)
+		assertTypeVersions(t, entries, "validation", 2)
+	})
+
+	t.Run("assumption+decision+validation independent append", func(t *testing.T) {
+		traceID := "runtime-ledger:req-type-version:decision-assumption"
+		base := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
+
+		entries, _, _ := activation.BuildRuntimeLedgerEntries(nil, activation.RuntimeLedgerBuildInput{
+			TraceID:        traceID,
+			RunID:          "req-type-version:decision:1",
+			TriggerKind:    model.ValidationTriggerManualRerun,
+			MachineStatus:  model.ValidationStatusWarned,
+			Timestamp:      base,
+			SourceRefs:     []string{"docs/AIDP/runtime/02-决策日志.md"},
+			Finalized:      false,
+			DeferredReason: "awaiting finalize",
+		})
+		entries, _, _ = activation.BuildRuntimeLedgerEntries(entries, activation.RuntimeLedgerBuildInput{
+			TraceID:        traceID,
+			RunID:          "req-type-version:decision:2",
+			TriggerKind:    model.ValidationTriggerManualRerun,
+			MachineStatus:  model.ValidationStatusWarned,
+			Timestamp:      base.Add(1 * time.Hour),
+			SourceRefs:     []string{"docs/AIDP/runtime/02-决策日志.md"},
+			Finalized:      false,
+			DeferredReason: "awaiting finalize",
+		})
+
+		assertTypeVersions(t, entries, "assumption", 2)
+		assertTypeVersions(t, entries, "decision", 2)
+		assertTypeVersions(t, entries, "validation", 2)
+	})
+}
+
 func TestM4RuntimeLedgerDeferredWindowAndEscalation(t *testing.T) {
 	traceID := "runtime-ledger:req-deferred:04:03"
 	base := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
@@ -214,14 +298,27 @@ func TestM4RuntimeLedgerDeferredWindowAndEscalation(t *testing.T) {
 		Finalized:      false,
 		DeferredReason: "still awaiting finalize",
 	})
-	if len(entries) != 2 {
-		t.Fatalf("expected 2 entries after overdue append, got %d", len(entries))
+	if len(entries) != 4 {
+		t.Fatalf("expected 4 entries after overdue append (assumption+validation x2), got %d", len(entries))
 	}
 	if !overdueCurrent.RiskEscalated {
 		t.Fatalf("expected overdue escalation risk=true, got %+v", overdueCurrent)
 	}
 	if overdueCurrent.RunID != "req-deferred:validation:2" || overdueCurrent.TraceID != traceID {
 		t.Fatalf("expected overdue path keep run_id/trace_id, got %+v", overdueCurrent)
+	}
+	assumptionVersions := 0
+	validationVersions := 0
+	for _, entry := range entries {
+		switch entry.RecordType {
+		case "assumption":
+			assumptionVersions++
+		case "validation":
+			validationVersions++
+		}
+	}
+	if assumptionVersions != 2 || validationVersions != 2 {
+		t.Fatalf("expected assumption/validation versions both 2, got assumption=%d validation=%d entries=%+v", assumptionVersions, validationVersions, entries)
 	}
 }
 
