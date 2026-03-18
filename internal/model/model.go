@@ -34,6 +34,10 @@ var RuntimeLedgerRecordTypeAllowed = map[string]bool{
 	RuntimeLedgerRecordTypeValidation: true,
 }
 
+func IsRuntimeLedgerRecordType(recordType string) bool {
+	return RuntimeLedgerRecordTypeAllowed[recordType]
+}
+
 type Node struct {
 	ID                  string
 	Level               string

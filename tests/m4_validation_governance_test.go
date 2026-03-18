@@ -126,14 +126,19 @@ func TestM4RuntimeLedgerVersionAppendOnly(t *testing.T) {
 	if mode != activation.LedgerWriteModeImmediate {
 		t.Fatalf("expected immediate mode, got %s", mode)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 ledger entry, got %d", len(entries))
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 ledger entries (change/decision/validation), got %d", len(entries))
 	}
-	if !entries[0].IsCurrent || entries[0].Version != 1 {
-		t.Fatalf("expected first entry current v1, got %+v", entries[0])
+	for _, entry := range entries {
+		if !entry.IsCurrent || entry.Version != 1 {
+			t.Fatalf("expected first batch entries current v1, got %+v", entry)
+		}
 	}
 	if firstCurrent.RunID != "req-append:validation:1" {
 		t.Fatalf("unexpected first run id: %+v", firstCurrent)
+	}
+	if firstCurrent.RecordType != "validation" {
+		t.Fatalf("expected first current entry record_type validation, got %+v", firstCurrent)
 	}
 
 	secondTS := firstTS.Add(2 * time.Hour)
@@ -149,16 +154,25 @@ func TestM4RuntimeLedgerVersionAppendOnly(t *testing.T) {
 	if mode != activation.LedgerWriteModeBatchFinalize {
 		t.Fatalf("expected batch_finalize mode, got %s", mode)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("expected 2 ledger entries, got %d", len(entries))
+	if len(entries) != 4 {
+		t.Fatalf("expected 4 ledger entries after second run, got %d", len(entries))
 	}
-	if entries[0].IsCurrent {
-		t.Fatalf("expected previous version IsCurrent=false, got %+v", entries[0])
+	validationVersions := []model.RuntimeLedgerEntry{}
+	for _, entry := range entries {
+		if entry.RecordType == "validation" {
+			validationVersions = append(validationVersions, entry)
+		}
 	}
-	if !entries[1].IsCurrent || entries[1].Version != 2 {
-		t.Fatalf("expected second entry current v2, got %+v", entries[1])
+	if len(validationVersions) != 2 {
+		t.Fatalf("expected 2 validation versions, got %+v", validationVersions)
 	}
-	if secondCurrent.Version != 2 || secondCurrent.RunID != "req-append:validation:2" {
+	if validationVersions[0].IsCurrent {
+		t.Fatalf("expected previous validation version IsCurrent=false, got %+v", validationVersions[0])
+	}
+	if !validationVersions[1].IsCurrent || validationVersions[1].Version != 2 {
+		t.Fatalf("expected latest validation current v2, got %+v", validationVersions[1])
+	}
+	if secondCurrent.Version != 2 || secondCurrent.RunID != "req-append:validation:2" || secondCurrent.RecordType != "validation" {
 		t.Fatalf("unexpected second current entry: %+v", secondCurrent)
 	}
 }

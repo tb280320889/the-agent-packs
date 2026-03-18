@@ -68,6 +68,7 @@ type RuntimeLedgerBuildInput struct {
 	SourceRefs          []string
 	Finalized           bool
 	DeferredReason      string
+	DeferredDeadline    string
 	HasBlockingDecision bool
 }
 
@@ -93,40 +94,98 @@ func BuildRuntimeLedgerEntries(existing []model.RuntimeLedgerEntry, input Runtim
 	if traceID == "" {
 		traceID = "runtime-ledger:unknown"
 	}
-	entry := model.RuntimeLedgerEntry{
-		TraceID:    traceID,
-		RunID:      input.RunID,
-		RecordType: model.RuntimeLedgerRecordTypeValidation,
-		Timestamp:  now.Format(time.RFC3339),
-		SourceRefs: append([]string{}, input.SourceRefs...),
-		Status:     input.MachineStatus,
-	}
-	if !model.RuntimeLedgerRecordTypeAllowed[entry.RecordType] {
-		entry.RecordType = model.RuntimeLedgerRecordTypeValidation
-	}
 	mode := resolveLedgerWriteMode(input.TriggerKind, input.MachineStatus, input.HasBlockingDecision)
-	if mode == LedgerWriteModeBatchFinalize && !input.Finalized {
-		entry.Status = "deferred"
-		reason := strings.TrimSpace(input.DeferredReason)
-		if reason == "" {
-			reason = "awaiting plan finalization"
+	recordTypes := determineRuntimeLedgerRecordTypes(input, mode)
+
+	updated := append([]model.RuntimeLedgerEntry{}, existing...)
+	latestByType := map[string]model.RuntimeLedgerEntry{}
+	for _, recordType := range recordTypes {
+		entry := model.RuntimeLedgerEntry{
+			TraceID:    traceID,
+			RunID:      input.RunID,
+			RecordType: recordType,
+			Timestamp:  now.Format(time.RFC3339),
+			SourceRefs: append([]string{}, input.SourceRefs...),
+			Status:     input.MachineStatus,
 		}
-		entry.DeferredReason = reason
-		deadline := now.Add(runtimeLedgerDeferredWindow()).UTC()
-		entry.DeferredDeadline = deadline.Format(time.RFC3339)
-		for _, prior := range existing {
-			if prior.TraceID == traceID && prior.RecordType == entry.RecordType && prior.IsCurrent && strings.TrimSpace(prior.DeferredDeadline) != "" {
-				entry.DeferredDeadline = prior.DeferredDeadline
-				break
+		if !model.IsRuntimeLedgerRecordType(entry.RecordType) {
+			continue
+		}
+		if mode == LedgerWriteModeBatchFinalize && !input.Finalized {
+			entry.Status = "deferred"
+			reason := strings.TrimSpace(input.DeferredReason)
+			if reason == "" {
+				reason = "awaiting plan finalization"
+			}
+			entry.DeferredReason = reason
+
+			deadline := strings.TrimSpace(input.DeferredDeadline)
+			if deadline == "" {
+				deadline = now.Add(runtimeLedgerDeferredWindow()).UTC().Format(time.RFC3339)
+			}
+			for _, prior := range updated {
+				if prior.TraceID == traceID && prior.RecordType == entry.RecordType && prior.IsCurrent && strings.TrimSpace(prior.DeferredDeadline) != "" {
+					deadline = prior.DeferredDeadline
+					break
+				}
+			}
+			entry.DeferredDeadline = deadline
+			if parsed, err := time.Parse(time.RFC3339, deadline); err == nil && now.After(parsed) {
+				entry.RiskEscalated = true
 			}
 		}
-		if parsed, err := time.Parse(time.RFC3339, entry.DeferredDeadline); err == nil && now.After(parsed) {
-			entry.RiskEscalated = true
-		}
+
+		updated = appendRuntimeLedgerVersion(updated, entry)
+		latestByType[recordType] = updated[len(updated)-1]
 	}
 
-	updated := appendRuntimeLedgerVersion(existing, entry)
+	if validationEntry, ok := latestByType[model.RuntimeLedgerRecordTypeValidation]; ok {
+		if hasEscalationInEntries(latestByType) {
+			validationEntry.RiskEscalated = true
+		}
+		return updated, validationEntry, mode
+	}
+
+	if len(updated) == 0 {
+		return existing, model.RuntimeLedgerEntry{}, mode
+	}
 	return updated, updated[len(updated)-1], mode
+}
+
+func determineRuntimeLedgerRecordTypes(input RuntimeLedgerBuildInput, mode LedgerWriteMode) []string {
+	typeSet := map[string]bool{
+		model.RuntimeLedgerRecordTypeValidation: true,
+	}
+
+	if input.TriggerKind == model.ValidationTriggerRuleChangeAuto || input.TriggerKind == model.ValidationTriggerValidatorManifestChangeAuto {
+		typeSet[model.RuntimeLedgerRecordTypeChange] = true
+	}
+
+	if input.MachineStatus == model.ValidationStatusFailed || input.TriggerKind == model.ValidationTriggerManualRerun {
+		typeSet[model.RuntimeLedgerRecordTypeDecision] = true
+	}
+
+	hasDeferredInfo := strings.TrimSpace(input.DeferredReason) != "" || strings.TrimSpace(input.DeferredDeadline) != ""
+	if mode == LedgerWriteModeBatchFinalize && hasDeferredInfo {
+		typeSet[model.RuntimeLedgerRecordTypeAssumption] = true
+	}
+
+	ordered := make([]string, 0, len(model.RuntimeLedgerRecordTypes))
+	for _, recordType := range model.RuntimeLedgerRecordTypes {
+		if typeSet[recordType] {
+			ordered = append(ordered, recordType)
+		}
+	}
+	return ordered
+}
+
+func hasEscalationInEntries(entries map[string]model.RuntimeLedgerEntry) bool {
+	for _, entry := range entries {
+		if entry.RiskEscalated {
+			return true
+		}
+	}
+	return false
 }
 
 func appendRuntimeLedgerVersion(existing []model.RuntimeLedgerEntry, incoming model.RuntimeLedgerEntry) []model.RuntimeLedgerEntry {
