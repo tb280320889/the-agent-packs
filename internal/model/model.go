@@ -106,19 +106,21 @@ type ContextBundle struct {
 }
 
 type ActivationResult struct {
-	RequestID         string               `json:"request_id"`
-	Status            string               `json:"status"`
-	MainPack          *string              `json:"main_pack"`
-	RouteStatus       string               `json:"route_status,omitempty"`
-	RouteErrorCode    string               `json:"route_error_code,omitempty"`
-	RouteNextAction   string               `json:"route_next_action,omitempty"`
-	RouteDecision     string               `json:"route_decision_basis,omitempty"`
-	RouteTraceID      string               `json:"route_decision_trace_id,omitempty"`
-	RouteDocsRef      string               `json:"route_docs_ref"`
-	Artifacts         []Artifact           `json:"artifacts"`
-	ValidationResults []ValidationEnvelope `json:"validation_results"`
-	Handoff           map[string]any       `json:"handoff"`
-	Summary           string               `json:"summary"`
+	RequestID              string               `json:"request_id"`
+	Status                 string               `json:"status"`
+	MainPack               *string              `json:"main_pack"`
+	RouteStatus            string               `json:"route_status,omitempty"`
+	RouteErrorCode         string               `json:"route_error_code,omitempty"`
+	RouteNextAction        string               `json:"route_next_action,omitempty"`
+	RouteDecision          string               `json:"route_decision_basis,omitempty"`
+	RouteTraceID           string               `json:"route_decision_trace_id,omitempty"`
+	RouteDocsRef           string               `json:"route_docs_ref"`
+	Artifacts              []Artifact           `json:"artifacts"`
+	ValidationResults      []ValidationEnvelope `json:"validation_results"`
+	ValidationRunHistory   []ValidationEnvelope `json:"validation_run_history"`
+	CurrentValidationRunID string               `json:"current_validation_run_id"`
+	Handoff                map[string]any       `json:"handoff"`
+	Summary                string               `json:"summary"`
 }
 
 type Artifact struct {
@@ -159,9 +161,39 @@ type ValidatorResult struct {
 	ValidatedArtifacts []string  `json:"validated_artifacts"`
 }
 
+type ValidationEvidenceRef struct {
+	RefID      string `json:"ref_id"`
+	RefType    string `json:"ref_type"`
+	RefPath    string `json:"ref_path"`
+	StrongLink bool   `json:"strong_link"`
+}
+
+type ValidationMachineView struct {
+	Status            string   `json:"status"`
+	ErrorCodes        []string `json:"error_codes"`
+	RuleCodes         []string `json:"rule_codes"`
+	Trigger           string   `json:"trigger"`
+	RepairSuggestions []string `json:"repair_suggestions"`
+}
+
+type ValidationHumanView struct {
+	Summary     string   `json:"summary"`
+	NextActions []string `json:"next_actions"`
+}
+
 type ValidationEnvelope struct {
-	ValidationPlan   ValidationPlan    `json:"validation_plan"`
-	ValidatorResults []ValidatorResult `json:"validator_results"`
+	RunID              string                  `json:"run_id"`
+	PhaseID            string                  `json:"phase_id"`
+	PlanID             string                  `json:"plan_id"`
+	TriggerKind        string                  `json:"trigger_kind"`
+	TriggerReason      string                  `json:"trigger_reason"`
+	IsCurrentEffective bool                    `json:"is_current_effective"`
+	InputDigest        string                  `json:"input_digest"`
+	EvidenceRefs       []ValidationEvidenceRef `json:"evidence_refs"`
+	MachineView        ValidationMachineView   `json:"machine_view"`
+	HumanView          ValidationHumanView     `json:"human_view"`
+	ValidationPlan     ValidationPlan          `json:"validation_plan"`
+	ValidatorResults   []ValidatorResult       `json:"validator_results"`
 }
 
 type CompilerError struct {
