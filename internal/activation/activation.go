@@ -1,10 +1,13 @@
 package activation
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"the-agent-packs/internal/model"
 	"the-agent-packs/internal/query"
@@ -14,6 +17,10 @@ import (
 type requestShape struct {
 	RequestID       string          `json:"request_id"`
 	Task            string          `json:"task"`
+	PhaseID         string          `json:"phase_id"`
+	PlanID          string          `json:"plan_id"`
+	TriggerKind     string          `json:"validation_trigger_kind"`
+	TriggerReason   string          `json:"validation_trigger_reason"`
 	TargetPack      *string         `json:"target_pack"`
 	TargetDomain    *string         `json:"target_domain"`
 	BoundedContext  *boundedContext `json:"bounded_context"`
@@ -181,6 +188,101 @@ func mergeHints(primary, secondary []string) []string {
 	return merged
 }
 
+func fallbackOrDefault(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func collectCodesAndSuggestions(results []model.ValidatorResult) ([]string, []string, []string) {
+	errorCodes := []string{}
+	ruleCodes := []string{}
+	repairSuggestions := []string{}
+
+	appendUnique := func(target *[]string, values ...string) {
+		for _, value := range values {
+			trimmed := strings.TrimSpace(value)
+			if trimmed == "" {
+				continue
+			}
+			exists := false
+			for _, existing := range *target {
+				if existing == trimmed {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				*target = append(*target, trimmed)
+			}
+		}
+	}
+
+	for _, result := range results {
+		appendUnique(&repairSuggestions, result.RepairSuggestions...)
+		for _, finding := range result.Findings {
+			if finding.Severity == "error" {
+				appendUnique(&errorCodes, finding.Code)
+			}
+			appendUnique(&ruleCodes, finding.RuleRef, finding.SourceRule)
+		}
+	}
+
+	return errorCodes, ruleCodes, repairSuggestions
+}
+
+func makeInputDigest(req *requestShape, artifacts []model.Artifact) string {
+	snapshot := map[string]any{
+		"request_id":       req.RequestID,
+		"task":             req.Task,
+		"phase_id":         req.PhaseID,
+		"plan_id":          req.PlanID,
+		"trigger_kind":     req.TriggerKind,
+		"trigger_reason":   req.TriggerReason,
+		"selected_files":   req.SelectedFiles,
+		"config_fragments": req.ConfigFragments,
+		"context_hints":    req.ContextHints,
+		"artifacts":        artifacts,
+	}
+	payload, _ := json.Marshal(snapshot)
+	digest := sha256.Sum256(payload)
+	return fmt.Sprintf("sha256:%x", digest)
+}
+
+func buildEvidenceRefs(requestID, runID string, artifacts []model.Artifact, handoff map[string]any) []model.ValidationEvidenceRef {
+	evidenceRefs := make([]model.ValidationEvidenceRef, 0, len(artifacts)+2)
+	for _, artifact := range artifacts {
+		if strings.TrimSpace(artifact.Name) == "" {
+			continue
+		}
+		evidenceRefs = append(evidenceRefs, model.ValidationEvidenceRef{
+			RefID:      "artifact:" + artifact.Name,
+			RefType:    "artifact",
+			RefPath:    artifact.Name,
+			StrongLink: false,
+		})
+	}
+
+	if len(handoff) > 0 {
+		evidenceRefs = append(evidenceRefs, model.ValidationEvidenceRef{
+			RefID:      "handoff:" + requestID,
+			RefType:    "handoff",
+			RefPath:    "handoff",
+			StrongLink: true,
+		})
+	}
+
+	evidenceRefs = append(evidenceRefs, model.ValidationEvidenceRef{
+		RefID:      "runtime-ledger:" + runID,
+		RefType:    "runtime-ledger",
+		RefPath:    "runtime/ledger/" + runID,
+		StrongLink: true,
+	})
+
+	return evidenceRefs
+}
+
 func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	req, err := loadRequest(requestPath)
 	if err != nil {
@@ -278,6 +380,9 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	if len(artifacts) == 0 && mainPack == "wxt-manifest" {
 		artifacts = append(artifacts, model.Artifact{Name: "manifest-review.md", Kind: "review-report"})
 	}
+	if len(artifacts) == 0 {
+		artifacts = append(artifacts, model.Artifact{Name: "activation-output.json", Kind: "artifact"})
+	}
 
 	handoff := buildHandoff(mainPack, req.Task, bundle.RequiredPacks, artifacts)
 	contextInsufficient := len(req.BoundedContext.SelectedFiles) == 0 && len(req.BoundedContext.ConfigFragments) == 0
@@ -286,6 +391,10 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	vInput := validator.ExecutionInput{
 		Task:           req.Task,
 		MainPack:       mainPack,
+		PhaseID:        fallbackOrDefault(req.PhaseID, "04"),
+		PlanID:         fallbackOrDefault(req.PlanID, "unknown"),
+		TriggerKind:    fallbackOrDefault(req.TriggerKind, "milestone_auto"),
+		TriggerReason:  fallbackOrDefault(req.TriggerReason, "plan_milestone_validation"),
 		ContractBundle: &bundle,
 		Artifacts:      artifacts,
 		RequiredPacks:  append([]string{}, bundle.RequiredPacks...),
@@ -301,6 +410,41 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	}
 	validatorResults := validator.Run(plan, vInput)
 	status := deriveStatus(false, false, contextInsufficient, handoff, plan, validatorResults)
+	runID := fmt.Sprintf("%s:validation:%d", req.RequestID, time.Now().Unix())
+	errorCodes, ruleCodes, repairSuggestions := collectCodesAndSuggestions(validatorResults)
+	evidenceRefs := buildEvidenceRefs(req.RequestID, runID, vInput.Artifacts, handoff)
+	humanSummary := fmt.Sprintf("本次校验结论为 %s，已生成 %d 条证据引用并可追溯到运行账本。", status, len(evidenceRefs))
+	nextActions := []string{"如存在 error 级别问题，请先修复后再触发下一次 validation。"}
+	if status == "completed" {
+		nextActions = []string{"当前校验通过，可继续后续计划执行。"}
+	}
+	if status == "handoff" {
+		nextActions = []string{"请按 handoff 指引继续跨包协作并保留 run_id 追踪。"}
+	}
+
+	currentValidation := model.ValidationEnvelope{
+		RunID:              runID,
+		PhaseID:            vInput.PhaseID,
+		PlanID:             vInput.PlanID,
+		TriggerKind:        vInput.TriggerKind,
+		TriggerReason:      vInput.TriggerReason,
+		IsCurrentEffective: true,
+		InputDigest:        makeInputDigest(req, vInput.Artifacts),
+		EvidenceRefs:       evidenceRefs,
+		MachineView: model.ValidationMachineView{
+			Status:            status,
+			ErrorCodes:        errorCodes,
+			RuleCodes:         ruleCodes,
+			Trigger:           vInput.TriggerKind,
+			RepairSuggestions: repairSuggestions,
+		},
+		HumanView: model.ValidationHumanView{
+			Summary:     humanSummary,
+			NextActions: nextActions,
+		},
+		ValidationPlan:   plan,
+		ValidatorResults: validatorResults,
+	}
 
 	summary := "route to L1.wxt.manifest with required cross-cutting lines"
 	if contextInsufficient {
@@ -314,22 +458,21 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	}
 
 	return model.ActivationResult{
-		RequestID:       req.RequestID,
-		Status:          status,
-		MainPack:        ptr(mainPack),
-		RouteStatus:     routeResult.Status,
-		RouteErrorCode:  routeResult.ErrorCode,
-		RouteNextAction: routeResult.NextAction,
-		RouteDecision:   routeResult.DecisionBasis,
-		RouteTraceID:    routeResult.DecisionTraceID,
-		RouteDocsRef:    routeResult.DocsRef,
-		Artifacts:       artifacts,
-		ValidationResults: []model.ValidationEnvelope{{
-			ValidationPlan:   plan,
-			ValidatorResults: validatorResults,
-		}},
-		Handoff: handoff,
-		Summary: summary,
+		RequestID:              req.RequestID,
+		Status:                 status,
+		MainPack:               ptr(mainPack),
+		RouteStatus:            routeResult.Status,
+		RouteErrorCode:         routeResult.ErrorCode,
+		RouteNextAction:        routeResult.NextAction,
+		RouteDecision:          routeResult.DecisionBasis,
+		RouteTraceID:           routeResult.DecisionTraceID,
+		RouteDocsRef:           routeResult.DocsRef,
+		Artifacts:              artifacts,
+		ValidationResults:      []model.ValidationEnvelope{currentValidation},
+		ValidationRunHistory:   []model.ValidationEnvelope{currentValidation},
+		CurrentValidationRunID: runID,
+		Handoff:                handoff,
+		Summary:                summary,
 	}, nil
 }
 
