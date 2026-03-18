@@ -5,6 +5,11 @@ const (
 	ValidationStatusWarned = "warned"
 	ValidationStatusFailed = "failed"
 
+	RuntimeLedgerRecordTypeAssumption = "assumption"
+	RuntimeLedgerRecordTypeDecision   = "decision"
+	RuntimeLedgerRecordTypeChange     = "change"
+	RuntimeLedgerRecordTypeValidation = "validation"
+
 	ValidationTriggerMilestoneAuto               = "milestone_auto"
 	ValidationTriggerRuleChangeAuto              = "rule_change_auto"
 	ValidationTriggerValidatorManifestChangeAuto = "validator_manifest_change_auto"
@@ -14,6 +19,20 @@ const (
 	ActivationStatusPartial   = "partial"
 	ActivationStatusFailed    = "failed"
 )
+
+var RuntimeLedgerRecordTypes = []string{
+	RuntimeLedgerRecordTypeAssumption,
+	RuntimeLedgerRecordTypeDecision,
+	RuntimeLedgerRecordTypeChange,
+	RuntimeLedgerRecordTypeValidation,
+}
+
+var RuntimeLedgerRecordTypeAllowed = map[string]bool{
+	RuntimeLedgerRecordTypeAssumption: true,
+	RuntimeLedgerRecordTypeDecision:   true,
+	RuntimeLedgerRecordTypeChange:     true,
+	RuntimeLedgerRecordTypeValidation: true,
+}
 
 type Node struct {
 	ID                  string
@@ -134,8 +153,23 @@ type ActivationResult struct {
 	ValidationResults      []ValidationEnvelope `json:"validation_results"`
 	ValidationRunHistory   []ValidationEnvelope `json:"validation_run_history"`
 	CurrentValidationRunID string               `json:"current_validation_run_id"`
+	RuntimeLedger          []RuntimeLedgerEntry `json:"runtime_ledger,omitempty"`
 	Handoff                map[string]any       `json:"handoff"`
 	Summary                string               `json:"summary"`
+}
+
+type RuntimeLedgerEntry struct {
+	TraceID          string   `json:"trace_id"`
+	RunID            string   `json:"run_id"`
+	RecordType       string   `json:"record_type"`
+	Timestamp        string   `json:"timestamp"`
+	SourceRefs       []string `json:"source_refs"`
+	Status           string   `json:"status"`
+	Version          int      `json:"version"`
+	IsCurrent        bool     `json:"is_current"`
+	DeferredReason   string   `json:"deferred_reason,omitempty"`
+	DeferredDeadline string   `json:"deferred_deadline,omitempty"`
+	RiskEscalated    bool     `json:"risk_escalated"`
 }
 
 type Artifact struct {

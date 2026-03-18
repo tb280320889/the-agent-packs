@@ -38,6 +38,86 @@ type boundedContext struct {
 	BrowserHints    []string `json:"browser_hints"`
 }
 
+type LedgerWriteMode string
+
+const (
+	LedgerWriteModeImmediate     LedgerWriteMode = "immediate"
+	LedgerWriteModeBatchFinalize LedgerWriteMode = "batch_finalize"
+)
+
+type RuntimeLedgerBuildInput struct {
+	TraceID             string
+	RunID               string
+	TriggerKind         string
+	MachineStatus       string
+	Timestamp           time.Time
+	SourceRefs          []string
+	Finalized           bool
+	DeferredReason      string
+	HasBlockingDecision bool
+}
+
+func resolveLedgerWriteMode(triggerKind, machineStatus string, hasBlockingDecision bool) LedgerWriteMode {
+	if triggerKind == model.ValidationTriggerRuleChangeAuto {
+		return LedgerWriteModeImmediate
+	}
+	if machineStatus == model.ValidationStatusFailed {
+		return LedgerWriteModeImmediate
+	}
+	if hasBlockingDecision {
+		return LedgerWriteModeImmediate
+	}
+	return LedgerWriteModeBatchFinalize
+}
+
+func BuildRuntimeLedgerEntries(existing []model.RuntimeLedgerEntry, input RuntimeLedgerBuildInput) ([]model.RuntimeLedgerEntry, model.RuntimeLedgerEntry, LedgerWriteMode) {
+	now := input.Timestamp.UTC()
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	traceID := strings.TrimSpace(input.TraceID)
+	if traceID == "" {
+		traceID = "runtime-ledger:unknown"
+	}
+	entry := model.RuntimeLedgerEntry{
+		TraceID:    traceID,
+		RunID:      input.RunID,
+		RecordType: model.RuntimeLedgerRecordTypeValidation,
+		Timestamp:  now.Format(time.RFC3339),
+		SourceRefs: append([]string{}, input.SourceRefs...),
+		Status:     input.MachineStatus,
+	}
+	if !model.RuntimeLedgerRecordTypeAllowed[entry.RecordType] {
+		entry.RecordType = model.RuntimeLedgerRecordTypeValidation
+	}
+	mode := resolveLedgerWriteMode(input.TriggerKind, input.MachineStatus, input.HasBlockingDecision)
+	if mode == LedgerWriteModeBatchFinalize && !input.Finalized {
+		entry.Status = "deferred"
+	}
+
+	updated := appendRuntimeLedgerVersion(existing, entry)
+	return updated, updated[len(updated)-1], mode
+}
+
+func appendRuntimeLedgerVersion(existing []model.RuntimeLedgerEntry, incoming model.RuntimeLedgerEntry) []model.RuntimeLedgerEntry {
+	updated := make([]model.RuntimeLedgerEntry, len(existing))
+	copy(updated, existing)
+	maxVersion := 0
+	for i := range updated {
+		entry := updated[i]
+		if entry.TraceID == incoming.TraceID && entry.RecordType == incoming.RecordType {
+			if entry.Version > maxVersion {
+				maxVersion = entry.Version
+			}
+			updated[i].IsCurrent = false
+		}
+	}
+	incoming.Version = maxVersion + 1
+	incoming.IsCurrent = true
+	updated = append(updated, incoming)
+	return updated
+}
+
 func loadRequest(path string) (*requestShape, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -485,6 +565,18 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		nextActions = []string{fmt.Sprintf("记录 warned 处理意见并链接 run_id=%s", runID)}
 	}
 
+	runtimeLedger, ledgerEntry, _ := BuildRuntimeLedgerEntries(nil, RuntimeLedgerBuildInput{
+		TraceID:             fmt.Sprintf("runtime-ledger:%s:%s:%s", req.RequestID, vInput.PhaseID, vInput.PlanID),
+		RunID:               runID,
+		TriggerKind:         vInput.TriggerKind,
+		MachineStatus:       machineStatus,
+		Timestamp:           time.Now().UTC(),
+		SourceRefs:          []string{routeResult.DocsRef, "docs/AIDP/runtime/06-验证记录.md", "docs/AIDP/runtime/03-变更摘要.md"},
+		Finalized:           false,
+		HasBlockingDecision: status == model.ActivationStatusFailed,
+	})
+	_ = ledgerEntry
+
 	currentValidation := model.ValidationEnvelope{
 		RunID:              runID,
 		PhaseID:            vInput.PhaseID,
@@ -534,6 +626,7 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 		ValidationResults:      []model.ValidationEnvelope{currentValidation},
 		ValidationRunHistory:   []model.ValidationEnvelope{currentValidation},
 		CurrentValidationRunID: runID,
+		RuntimeLedger:          runtimeLedger,
 		Handoff:                handoff,
 		Summary:                summary,
 	}, nil
