@@ -17,6 +17,7 @@ const (
 
 	ActivationStatusCompleted = "completed"
 	ActivationStatusPartial   = "partial"
+	ActivationStatusHandoff   = "handoff"
 	ActivationStatusFailed    = "failed"
 )
 

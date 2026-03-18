@@ -642,6 +642,10 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	}
 	validatorResults := validator.Run(plan, vInput)
 	status, machineStatus := deriveStatuses(false, false, plan, validatorResults)
+	hasBlocking := hasBlockingFailure(plan.SeverityPolicy, validatorResults)
+	if len(handoff) > 0 && !hasBlocking && strings.TrimSpace(req.PhaseID) == "" && strings.TrimSpace(req.PlanID) == "" {
+		status = model.ActivationStatusHandoff
+	}
 	runID := fmt.Sprintf("%s:validation:%d", req.RequestID, time.Now().Unix())
 	errorCodes, ruleCodes, repairSuggestions := collectCodesAndSuggestions(validatorResults)
 	evidenceRefs := buildEvidenceRefs(req.RequestID, runID, vInput.Artifacts, handoff)
