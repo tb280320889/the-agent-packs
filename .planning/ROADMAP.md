@@ -111,6 +111,12 @@ Plans:
 
 **Requirements:** DOMN-01, DOMN-02
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — 接入 monorepo-oss-governance 第二主域并落地特性开关回退
+- [ ] 05-02-PLAN.md — 固化 WXT 非回归矩阵并产出新主域准入清单
+
 **Success Criteria:**
 1. 第二主域可按同一 registry/routing 契约完成准入与激活。
 2. WXT 样板路径在新增主域后仍保持行为一致与验证通过。
