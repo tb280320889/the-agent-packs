@@ -180,50 +180,50 @@ func hasWarnFindings(results []model.ValidatorResult) bool {
 
 func deriveStatuses(requestInvalid bool, routeMissing bool, plan model.ValidationPlan, results []model.ValidatorResult) (string, string) {
 	if requestInvalid {
-		return "failed", "failed"
+		return model.ActivationStatusFailed, model.ValidationStatusFailed
 	}
 	if routeMissing {
-		return "failed", "failed"
+		return model.ActivationStatusFailed, model.ValidationStatusFailed
 	}
 	if hasBlockingFailure(plan.SeverityPolicy, results) {
-		return "failed", "failed"
+		return model.ActivationStatusFailed, model.ValidationStatusFailed
 	}
 	if hasWarnFindings(results) && plan.SeverityPolicy["warn"] == "allow_partial" {
-		return "partial", "warned"
+		return model.ActivationStatusPartial, model.ValidationStatusWarned
 	}
-	return "completed", "passed"
+	return model.ActivationStatusCompleted, model.ValidationStatusPassed
 }
 
 func resolveTrigger(req *requestShape) (string, string) {
 	if req.ManualRerun {
-		return "manual_rerun", "manual validation rerun requested"
+		return model.ValidationTriggerManualRerun, "manual validation rerun requested"
 	}
 	kind := strings.TrimSpace(req.TriggerKind)
 	if kind == "" {
-		kind = "milestone_auto"
+		kind = model.ValidationTriggerMilestoneAuto
 	}
 	reason := strings.TrimSpace(req.TriggerReason)
 	if reason == "" {
 		switch kind {
-		case "rule_change_auto":
+		case model.ValidationTriggerRuleChangeAuto:
 			reason = "auto-triggered by rule change"
-		case "validator_manifest_change_auto":
+		case model.ValidationTriggerValidatorManifestChangeAuto:
 			reason = "auto-triggered by validator manifest change"
-		case "manual_rerun":
+		case model.ValidationTriggerManualRerun:
 			reason = "manual validation rerun requested"
 		default:
-			kind = "milestone_auto"
+			kind = model.ValidationTriggerMilestoneAuto
 			reason = "auto-triggered by milestone validation"
 		}
 	}
 	allowed := map[string]bool{
-		"milestone_auto":                 true,
-		"rule_change_auto":               true,
-		"validator_manifest_change_auto": true,
-		"manual_rerun":                   true,
+		model.ValidationTriggerMilestoneAuto:               true,
+		model.ValidationTriggerRuleChangeAuto:              true,
+		model.ValidationTriggerValidatorManifestChangeAuto: true,
+		model.ValidationTriggerManualRerun:                 true,
 	}
 	if !allowed[kind] {
-		kind = "milestone_auto"
+		kind = model.ValidationTriggerMilestoneAuto
 		reason = "auto-triggered by milestone validation"
 	}
 	return kind, reason
@@ -478,10 +478,10 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	evidenceRefs := buildEvidenceRefs(req.RequestID, runID, vInput.Artifacts, handoff)
 	humanSummary := fmt.Sprintf("本次校验结论为 %s，已生成 %d 条证据引用并可追溯到运行账本。", machineStatus, len(evidenceRefs))
 	nextActions := []string{"如存在 error 级别问题，请先修复后再触发下一次 validation。"}
-	if machineStatus == "passed" {
+	if machineStatus == model.ValidationStatusPassed {
 		nextActions = []string{"当前校验通过，可继续后续计划执行。"}
 	}
-	if machineStatus == "warned" {
+	if machineStatus == model.ValidationStatusWarned {
 		nextActions = []string{fmt.Sprintf("记录 warned 处理意见并链接 run_id=%s", runID)}
 	}
 
@@ -513,7 +513,7 @@ func Execute(db *sql.DB, requestPath string) (model.ActivationResult, error) {
 	if contextInsufficient {
 		summary = "bounded context missing required evidence"
 	}
-	if len(handoff) > 0 && status == "completed" {
+	if len(handoff) > 0 && status == model.ActivationStatusCompleted {
 		summary = "handoff requested by task boundary"
 	}
 	if len(bundle.RecommendedValidators) == 0 && len(bundle.RecommendedArtifacts) == 0 {

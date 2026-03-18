@@ -1,5 +1,20 @@
 package model
 
+const (
+	ValidationStatusPassed = "passed"
+	ValidationStatusWarned = "warned"
+	ValidationStatusFailed = "failed"
+
+	ValidationTriggerMilestoneAuto               = "milestone_auto"
+	ValidationTriggerRuleChangeAuto              = "rule_change_auto"
+	ValidationTriggerValidatorManifestChangeAuto = "validator_manifest_change_auto"
+	ValidationTriggerManualRerun                 = "manual_rerun"
+
+	ActivationStatusCompleted = "completed"
+	ActivationStatusPartial   = "partial"
+	ActivationStatusFailed    = "failed"
+)
+
 type Node struct {
 	ID                  string
 	Level               string
