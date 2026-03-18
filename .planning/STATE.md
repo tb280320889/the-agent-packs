@@ -2,29 +2,29 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: Not started
+current_plan: 2
 status: unknown
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-18T02:36:46.088Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-18T05:41:27.288Z"
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 11
-  percent: 92
+  total_plans: 15
+  completed_plans: 12
+  percent: 80
 ---
 
 # GSD State: the-agent-packs
 
 **Initialized:** 2026-03-16  
-**Current Status:** Phase 03 Plan 01 executed
+**Current Status:** Phase 04 Plan 01 executed
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 **Core value:** 在不泄露全仓语义的前提下，向消费侧稳定交付目标域最小且完整的上下文。  
-**Current focus:** Phase 3 — Contracted Delivery
+**Current focus:** Phase 4 — Validation & Runtime Governance
 
 ## Workflow Configuration Snapshot
 
@@ -38,11 +38,11 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [█████████░] 92%
-- **Current Plan:** Not started
-- **Total Plans in Phase:** 2
-- Current Phase: 03
-- Phase 03 Plans Completed: 1/2
+- **Progress:** [████████░░] 80%
+- **Current Plan:** 2
+- **Total Plans in Phase:** 3
+- Current Phase: 04
+- Phase 04 Plans Completed: 0/3
 
 ## Decisions
 
@@ -63,6 +63,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 03]: 将 contract delivery 检查器作为独立 validator（validator-contract-delivery）接入现有 runner。
 - [Phase 03]: P0 违规固定为 failed(error)，非阻断说明弱问题固定为 warned(warn)。
 - [Phase 03]: validator 输入以 ContextBundle 为契约真相源，Activation 层仅透传 ContractBundle。
+- [Phase 04]: Validation run_id 采用 request_id:validation:unix_ts 以保证单次执行可追溯
+- [Phase 04]: EvidenceRefs 统一输出 artifact/handoff/runtime-ledger 三类引用并保留强链接
+- [Phase 04]: Validation 输出同时提供 MachineView 与 HumanView，避免仅状态值
 
 ## Performance Metrics
 
@@ -76,12 +79,13 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | Phase 02 P02 | 8 min | 3 tasks | 6 files |
 | Phase 03 P01 | 25 min | 3 tasks | 3 files |
 | Phase 03 P02 | 7 min | 3 tasks | 7 files |
+| Phase 04 P01 | 3 min | 3 tasks | 4 files |
 
 ## Session
 
-- **Last session:** 2026-03-18T02:36:46.078Z
-- **Stopped At:** Phase 4 context gathered
-- **Resume file:** .planning/phases/04-validation-runtime-governance/04-CONTEXT.md
+- **Last session:** 2026-03-18T05:41:27.282Z
+- **Stopped At:** Completed 04-01-PLAN.md
+- **Resume file:** None
 
 ## Roadmap Snapshot
 
@@ -118,7 +122,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Next Action
 
-执行：继续 Phase 03 Plan 02。
+执行：继续 Phase 04 Plan 02。
 
 ## Phase 01.1 Execution Snapshot
 

@@ -30,7 +30,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Validation & Runtime Governance
 
 - [ ] **VALD-01**: Maintainer can execute core + domain validators from registry-defined plans
-- [ ] **VALD-02**: Maintainer can trace validation results to activation artifacts and handoff outputs
+- [x] **VALD-02**: Maintainer can trace validation results to activation artifacts and handoff outputs
 - [ ] **GOVR-01**: Maintainer can update runtime ledgers (assumption/decision/change/validation) for every key change
 
 ### Domain Expansion Readiness
@@ -78,7 +78,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONT-02 | Phase 3 | Complete |
 | CONT-03 | Phase 3 | Complete |
 | VALD-01 | Phase 4 | Pending |
-| VALD-02 | Phase 4 | Pending |
+| VALD-02 | Phase 4 | Complete |
 | GOVR-01 | Phase 4 | Pending |
 | DOMN-01 | Phase 5 | Pending |
 | DOMN-02 | Phase 5 | Pending |
