@@ -1,0 +1,45 @@
+# Phase Context
+
+## 当前阶段
+- 名称：增强包生产者系统语义校准与身份边界澄清
+- 状态：in_progress
+- 主要目标：以 `docs/AIDP/` 明确本项目作为增强包生产者系统的真实语义，并澄清生产者、消费侧 agent、开发 agent 三类身份边界
+
+## 当前事实
+- 已有 Brownfield 代码扫描结果可支撑首版 AIDP 生成
+- 旧 `docs/改造计划v1/` 已提供主要阶段语义来源
+- 根目录 `AGENTS.md` 已切换默认索引
+- 当前需要防止后续文档继续沿用“泛化编排系统”旧叙事
+
+## 当前输出
+- 项目专属 AIDP 文档集
+- 更新后的 agent 阅读入口
+- 身份视角与消费契约基线
+- `WXT` 样板消费契约的文档级验证口径
+
+## 当前风险
+- 旧入口若未同步声明，会导致 agent 继续从旧目录进入
+- 后续若不维护 runtime 文档，AIDP 会再次退化为静态文档包
+- 若角色边界未继续写入规则与验收，后续开发仍可能把开发侧与消费侧混淆
+- 若样板消费契约不继续下沉到实现与测试层，后续扩域时仍会出现“知道原则但不会验证”的问题
+
+## 下一步建议
+- 将后续规划、执行、验证任务都通过 AIDP + GSD 双层维护
+- 将消费侧上下文交付契约进一步固化到实现与验证流程
+- 逐步将旧快照/交接中的长期有效结论转写进 runtime 工件
+- 在后续 GSD 任务中，为 `WXT -> wxt-manifest` 建立更接近实现层的检查项或测试用例
+
+## Phase 01.1 补充上下文
+- 名称：brownfield 大检查与结构治理提交
+- 状态：completed (plans 01/02/03 executed)
+- 边界：仅结构治理、映射、归档门禁与运行态回写；不做功能扩展
+- 删除决策：checkpoint 默认 `option-b`（暂不删除，等待人工明确批准）
+- 关键产物：`01.1-STRUCTURE-AUDIT.md`、`01.1-TARGET-TREE.md`、`01.1-MIGRATION-MAP.md`、`01.1-REFAC-COMMIT-PLAN.md`、`01.1-COMMIT-LOG.md`
+- 风险提示：若长期不做人工确认，`docs/archive/2026-03-phase-01.1/` 会积累待删项
+
+## 2026-03 Phase 04 Runtime Governance 更新
+- 名称：Validation & Runtime Governance（Plan 04-03）
+- 状态：in_progress（执行中）
+- 当前更新：runtime ledger 已引入 `immediate/batch_finalize` 混合触发策略，并实现 `TraceID+RecordType` append-only 版本追加。
+- 风险变化：batch_finalize 延后补记改为强约束（默认 24h deadline + 超窗 `RiskEscalated`），降低“会话补记失联”风险。
+- 证据链：validation run 继续使用 `run_id` 强关联 runtime ledger（`runtime-ledger:{run_id}`），并在 warned/overdue 路径输出显式后续动作。

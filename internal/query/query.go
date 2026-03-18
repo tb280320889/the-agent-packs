@@ -1,6 +1,7 @@
 package query
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,12 @@ type packProfile struct {
 	RecommendedArtifacts  []string
 }
 
+type ValidatorManifest struct {
+	Validators []string
+	Sources    map[string][]string
+	Signature  string
+}
+
 type nodeRecord struct {
 	ID              string
 	Level           string
@@ -34,6 +41,17 @@ type nodeRecord struct {
 	Title           string
 	Summary         string
 }
+
+const (
+	routeStatusCompleted          = "completed"
+	routeStatusPartial            = "partial"
+	routeStatusFailed             = "failed"
+	routeErrCanonicalMissing      = "ROUTE_CANONICAL_MISSING"
+	routeErrNoPrimaryCandidate    = "ROUTE_NO_PRIMARY_CANDIDATE"
+	routeNextActionCheckCanonical = "检查 registry canonical 映射"
+	routeNextActionRefineEvidence = "补充 target_domain 或上下文证据后重试"
+	routeNextActionRefineTask     = "补充 task 关键词或指定 target_pack 后重试"
+)
 
 func PackForNode(nodeID string) string {
 	profile, ok := profileForNode(nodeID)
@@ -58,6 +76,79 @@ func profileForNode(nodeID string) (packProfile, bool) {
 		RecommendedValidators: append([]string{}, entry.RecommendedValidators...),
 		RecommendedArtifacts:  append([]string{}, entry.RecommendedArtifacts...),
 	}, true
+}
+
+func RecommendedValidators(mainPack string, requiredPacks []string) ValidatorManifest {
+	manifest := ValidatorManifest{
+		Validators: []string{"validator-core-output"},
+		Sources:    map[string][]string{"validator-core-output": {"registry-core-default"}},
+	}
+
+	reg, err := registry.Default()
+	if err != nil {
+		manifest.Signature = validatorManifestSignature(manifest.Validators)
+		return manifest
+	}
+
+	packScope := make([]string, 0, len(requiredPacks)+1)
+	if strings.TrimSpace(mainPack) != "" {
+		packScope = append(packScope, mainPack)
+	}
+	packScope = append(packScope, requiredPacks...)
+	if entry, ok := registry.FindByName(reg, mainPack); ok {
+		packScope = append(packScope, entry.RequiredPacks...)
+	}
+
+	seenPacks := map[string]bool{}
+	seenValidators := map[string]bool{"validator-core-output": true}
+
+	for _, packName := range packScope {
+		packName = strings.TrimSpace(packName)
+		if packName == "" || seenPacks[packName] {
+			continue
+		}
+		seenPacks[packName] = true
+
+		entry, ok := registry.FindByName(reg, packName)
+		if !ok {
+			continue
+		}
+
+		for _, validatorName := range entry.RecommendedValidators {
+			validatorName = strings.TrimSpace(validatorName)
+			if validatorName == "" {
+				continue
+			}
+			if !seenValidators[validatorName] {
+				manifest.Validators = append(manifest.Validators, validatorName)
+				seenValidators[validatorName] = true
+			}
+			manifest.Sources[validatorName] = append(manifest.Sources[validatorName], packName)
+		}
+	}
+
+	rest := make([]string, 0, len(manifest.Validators))
+	for _, validatorName := range manifest.Validators {
+		if validatorName == "validator-core-output" {
+			continue
+		}
+		rest = append(rest, validatorName)
+	}
+	sort.Strings(rest)
+	manifest.Validators = append([]string{"validator-core-output"}, rest...)
+
+	for validatorName, sources := range manifest.Sources {
+		manifest.Sources[validatorName] = dedupeAndSortIDs(sources)
+	}
+
+	manifest.Signature = validatorManifestSignature(manifest.Validators)
+	return manifest
+}
+
+func validatorManifestSignature(validators []string) string {
+	joined := strings.Join(validators, ",")
+	digest := sha256.Sum256([]byte(joined))
+	return fmt.Sprintf("sha256:%x", digest)
 }
 
 func OpenDB(dbPath string) (*sql.DB, error) {
@@ -264,57 +355,229 @@ func inferMainDomain(task string, selectedFiles, configFragments, contextHints [
 }
 
 func buildCandidate(candidate nodeRecord, score float64, reason []string) model.RouteCandidate {
+	pack := PackForNode(candidate.ID)
 	return model.RouteCandidate{
 		ID:              candidate.ID,
+		Pack:            pack,
 		Title:           candidate.Title,
 		Summary:         candidate.Summary,
 		Score:           score,
 		Reason:          reason,
+		ReasonCode:      "PRIMARY_CANDIDATE_SELECTED",
+		RuleRef:         "BR-08",
+		DocsRef:         "",
 		NodeKind:        candidate.NodeKind,
 		VisibilityScope: candidate.VisibilityScope,
 		ActivationMode:  candidate.ActivationMode,
 	}
 }
 
+func buildTraceID(level string, targetPack *string, targetDomain *string, activeDomain string, status string) string {
+	tp := "none"
+	if targetPack != nil && strings.TrimSpace(*targetPack) != "" {
+		tp = strings.TrimSpace(*targetPack)
+	}
+	td := "none"
+	if targetDomain != nil && strings.TrimSpace(*targetDomain) != "" {
+		td = strings.TrimSpace(*targetDomain)
+	}
+	ad := strings.TrimSpace(activeDomain)
+	if ad == "" {
+		ad = "none"
+	}
+	return fmt.Sprintf("route:%s:%s:%s:%s:%s", strings.ToLower(level), tp, td, ad, strings.ToLower(status))
+}
+
+func buildCanonicalMissingResult(level string, targetPack *string, targetDomain *string, activeDomain string) model.RouteResult {
+	return model.RouteResult{
+		Status:          routeStatusFailed,
+		ErrorCode:       routeErrCanonicalMissing,
+		Message:         "target_pack canonical mapping is missing or unroutable",
+		NextAction:      routeNextActionCheckCanonical,
+		DecisionBasis:   "target_pack>canonical_missing_hard_fail",
+		DecisionTraceID: buildTraceID(level, targetPack, targetDomain, activeDomain, routeStatusFailed),
+		DocsRef:         "",
+		Candidates:      []model.RouteCandidate{},
+		MustInclude:     []string{},
+	}
+}
+
+func candidateRulePriority(level string, candidate nodeRecord) int {
+	if level == "L0" {
+		switch candidate.NodeKind {
+		case "domain-root":
+			return 0
+		case "domain-orchestrator":
+			return 1
+		default:
+			return 99
+		}
+	}
+	if level == "L1" {
+		switch candidate.NodeKind {
+		case "domain-orchestrator":
+			return 0
+		case "workflow-entry":
+			return 1
+		default:
+			return 99
+		}
+	}
+	return 99
+}
+
+func canonicalHit(candidate nodeRecord) bool {
+	reg, err := registry.Default()
+	if err != nil {
+		return false
+	}
+	entry, ok := registry.FindByNode(reg, candidate.ID)
+	if !ok {
+		return false
+	}
+	return entry.CanonicalBlueprintNode == candidate.ID
+}
+
+func stablePrimarySort(level string, activeDomain string, rows []nodeRecord, scored map[string]float64, reasons map[string][]string) []model.RouteCandidate {
+	ordered := append([]nodeRecord{}, rows...)
+	sort.Slice(ordered, func(i, j int) bool {
+		left := ordered[i]
+		right := ordered[j]
+
+		leftScore := scored[left.ID]
+		rightScore := scored[right.ID]
+		if leftScore != rightScore {
+			return leftScore > rightScore
+		}
+
+		leftCanonical := canonicalHit(left)
+		rightCanonical := canonicalHit(right)
+		if leftCanonical != rightCanonical {
+			return leftCanonical
+		}
+
+		leftDomainMatch := activeDomain != "" && left.Domain == activeDomain
+		rightDomainMatch := activeDomain != "" && right.Domain == activeDomain
+		if leftDomainMatch != rightDomainMatch {
+			return leftDomainMatch
+		}
+
+		leftRule := candidateRulePriority(level, left)
+		rightRule := candidateRulePriority(level, right)
+		if leftRule != rightRule {
+			return leftRule < rightRule
+		}
+
+		return left.ID < right.ID
+	})
+
+	result := make([]model.RouteCandidate, 0, len(ordered))
+	for _, row := range ordered {
+		reason := append([]string{}, reasons[row.ID]...)
+		result = append(result, buildCandidate(row, scored[row.ID], reason))
+	}
+	return result
+}
+
+func stableAttachIDs(ids []string) []string {
+	unique := make([]string, 0, len(ids))
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+	sort.Strings(unique)
+	return unique
+}
+
+func dedupeAndSortIDs(values []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
+}
+
 func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targetDomain *string, selectedFiles, configFragments, contextHints []string, maxResults int) (model.RouteResult, error) {
+	activeDomain := ""
+	if targetDomain != nil {
+		activeDomain = *targetDomain
+	} else {
+		activeDomain = inferMainDomain(task, selectedFiles, configFragments, contextHints)
+	}
+
 	if targetPack != nil {
 		reg, regErr := registry.Default()
 		if regErr == nil {
 			if entry, ok := registry.FindByName(reg, *targetPack); ok {
-				mappedNode := entry.CanonicalBlueprintNode
+				mappedNode := strings.TrimSpace(entry.CanonicalBlueprintNode)
+				if mappedNode == "" {
+					return buildCanonicalMissingResult(level, targetPack, targetDomain, activeDomain), nil
+				}
 				directRec, recErr := fetchNodeRecord(db, mappedNode)
 				direct, err := ReadNode(db, mappedNode, "summary")
-				if err == nil && recErr == nil && direct != nil && direct.Level == level {
-					must, _ := fetchEdges(db, direct.ID, "required_with")
-					reason := []string{"target_pack match"}
-					if targetDomain != nil {
-						reason = append(reason, fmt.Sprintf("target_domain=%s bypassed by explicit target_pack", *targetDomain))
+				if err != nil || recErr != nil || direct == nil || direct.Level != level {
+					return buildCanonicalMissingResult(level, targetPack, targetDomain, activeDomain), nil
+				}
+
+				must := []string{}
+				must, _ = fetchEdges(db, direct.ID, "required_with")
+				if profile, ok := profileForNode(direct.ID); ok {
+					reg, err := registry.Default()
+					if err == nil {
+						for _, packName := range profile.RequiredPacks {
+							if requiredEntry, found := registry.FindByName(reg, packName); found {
+								must = append(must, requiredEntry.CanonicalBlueprintNode)
+							}
+						}
 					}
-					return model.RouteResult{
-						Candidates: []model.RouteCandidate{{
-							ID:              direct.ID,
-							Title:           direct.Title,
-							Summary:         direct.Summary,
-							Score:           99.0,
-							Reason:          reason,
-							NodeKind:        directRec.NodeKind,
-							VisibilityScope: directRec.VisibilityScope,
-							ActivationMode:  directRec.ActivationMode,
-						}},
-						MustInclude: must,
-					}, nil
+				}
+
+				reason := []string{"target_pack match"}
+				if targetDomain != nil {
+					reason = append(reason, "target_domain ignored due to explicit target_pack")
+				}
+				candidate := model.RouteCandidate{
+					ID:              direct.ID,
+					Pack:            PackForNode(direct.ID),
+					Title:           direct.Title,
+					Summary:         direct.Summary,
+					Score:           99.0,
+					Reason:          reason,
+					ReasonCode:      "TARGET_PACK_EXACT",
+					RuleRef:         "BR-04",
+					DocsRef:         "",
+					NodeKind:        directRec.NodeKind,
+					VisibilityScope: directRec.VisibilityScope,
+					ActivationMode:  directRec.ActivationMode,
 				}
 				return model.RouteResult{
-					Candidates: []model.RouteCandidate{{
-						ID:              entry.CanonicalBlueprintNode,
-						Title:           entry.Name,
-						Summary:         entry.Category,
-						Score:           99.0,
-						Reason:          []string{"target_pack match", "registry fallback"},
-						VisibilityScope: entry.VisibilityScope,
-						ActivationMode:  entry.ActivationMode,
-					}},
-					MustInclude: []string{},
+					Status:          routeStatusCompleted,
+					Message:         "routed by explicit target_pack",
+					DecisionBasis:   "target_pack>canonical_exact",
+					DecisionTraceID: buildTraceID(level, targetPack, targetDomain, activeDomain, routeStatusCompleted),
+					DocsRef:         "",
+					Candidates:      []model.RouteCandidate{candidate},
+					MustInclude:     dedupeAndSortIDs(must),
+					CapabilityDecisions: []model.RouteCapabilityDecision{
+						{
+							Pack:       candidate.Pack,
+							NodeID:     candidate.ID,
+							Attached:   true,
+							ReasonCode: "PRIMARY_BY_TARGET_PACK",
+							RuleRef:    "BR-04",
+							Message:    "explicit target_pack selected as primary",
+							DocsRef:    "",
+						},
+					},
 				}, nil
 			}
 		}
@@ -326,18 +589,36 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 		return model.RouteResult{}, err
 	}
 
-	activeDomain := ""
-	if targetDomain != nil {
-		activeDomain = *targetDomain
-	} else {
-		activeDomain = inferMainDomain(task, selectedFiles, configFragments, contextHints)
-	}
-
-	globalCandidates := make([]model.RouteCandidate, 0)
-	workflowCandidates := make([]model.RouteCandidate, 0)
+	globalPool := make([]nodeRecord, 0)
+	workflowPool := make([]nodeRecord, 0)
 	attachIDs := make([]string, 0)
 
 	for _, row := range nodes {
+		if level == "L0" {
+			if domainNodeAllowedInGlobal(row) {
+				globalPool = append(globalPool, row)
+			}
+			continue
+		}
+		if level == "L1" {
+			if workflowNodeAllowedInDomain(row, activeDomain) {
+				workflowPool = append(workflowPool, row)
+				continue
+			}
+			if capabilityAttachAllowed(row, activeDomain) {
+				attachIDs = append(attachIDs, row.ID)
+			}
+		}
+	}
+
+	scorePool := globalPool
+	if level == "L1" {
+		scorePool = workflowPool
+	}
+
+	scored := map[string]float64{}
+	reasons := map[string][]string{}
+	for _, row := range scorePool {
 		meta, err := fetchMeta(db, row.ID)
 		if err != nil {
 			return model.RouteResult{}, err
@@ -357,45 +638,43 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 		if score <= 0 {
 			continue
 		}
-
-		if level == "L0" && domainNodeAllowedInGlobal(row) {
+		if level == "L0" {
 			reason = append(reason, "global_candidate_space")
-			globalCandidates = append(globalCandidates, buildCandidate(row, score, reason))
-			continue
-		}
-		if level == "L1" && workflowNodeAllowedInDomain(row, activeDomain) {
+		} else {
 			reason = append(reason, "domain_candidate_space")
-			workflowCandidates = append(workflowCandidates, buildCandidate(row, score, reason))
-			continue
 		}
-		if level == "L1" && capabilityAttachAllowed(row, activeDomain) {
-			attachIDs = append(attachIDs, row.ID)
-		}
+		scored[row.ID] = score
+		reasons[row.ID] = reason
 	}
 
-	sort.Slice(globalCandidates, func(i, j int) bool {
-		if globalCandidates[i].Score == globalCandidates[j].Score {
-			return globalCandidates[i].ID < globalCandidates[j].ID
+	filteredRows := make([]nodeRecord, 0, len(scorePool))
+	for _, row := range scorePool {
+		if _, ok := scored[row.ID]; ok {
+			filteredRows = append(filteredRows, row)
 		}
-		return globalCandidates[i].Score > globalCandidates[j].Score
-	})
-	sort.Slice(workflowCandidates, func(i, j int) bool {
-		if workflowCandidates[i].Score == workflowCandidates[j].Score {
-			return workflowCandidates[i].ID < workflowCandidates[j].ID
-		}
-		return workflowCandidates[i].Score > workflowCandidates[j].Score
-	})
+	}
+	selected := stablePrimarySort(level, activeDomain, filteredRows, scored, reasons)
+	attachIDs = stableAttachIDs(attachIDs)
 
 	if maxResults <= 0 {
 		maxResults = 3
 	}
 
-	selected := workflowCandidates
-	if level == "L0" {
-		selected = globalCandidates
-	}
 	if len(selected) > maxResults {
 		selected = selected[:maxResults]
+	}
+
+	capabilityDecisions := make([]model.RouteCapabilityDecision, 0, len(attachIDs))
+	for _, attachID := range attachIDs {
+		capabilityDecisions = append(capabilityDecisions, model.RouteCapabilityDecision{
+			Pack:       PackForNode(attachID),
+			NodeID:     attachID,
+			Attached:   true,
+			ReasonCode: "CAPABILITY_ATTACHED",
+			RuleRef:    "BR-03",
+			Message:    "attach-only capability attached after primary selection",
+			DocsRef:    "",
+		})
 	}
 
 	must := []string{}
@@ -411,24 +690,53 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 				}
 			}
 		}
-		seen := map[string]bool{}
-		merged := make([]string, 0, len(must)+len(attachIDs))
-		for _, id := range must {
-			if !seen[id] {
-				seen[id] = true
-				merged = append(merged, id)
-			}
-		}
-		for _, id := range attachIDs {
-			if !seen[id] {
-				seen[id] = true
-				merged = append(merged, id)
-			}
-		}
-		must = merged
+		must = dedupeAndSortIDs(append(must, attachIDs...))
 	}
 
-	return model.RouteResult{Candidates: selected, MustInclude: must}, nil
+	decisionBasis := "score>canonical>domain>rule>lexicographic"
+	status := routeStatusCompleted
+	errCode := ""
+	message := "primary candidate selected"
+	nextAction := ""
+	if len(selected) == 0 {
+		decisionBasis = "candidate_space_filtered_no_primary"
+		errCode = routeErrNoPrimaryCandidate
+		if targetDomain != nil {
+			status = routeStatusPartial
+			message = "no primary candidate matched in target_domain"
+			nextAction = routeNextActionRefineEvidence
+		} else {
+			status = routeStatusFailed
+			message = "no route candidate"
+			nextAction = routeNextActionRefineTask
+		}
+		capabilityDecisions = make([]model.RouteCapabilityDecision, 0, len(attachIDs))
+		for _, attachID := range attachIDs {
+			capabilityDecisions = append(capabilityDecisions, model.RouteCapabilityDecision{
+				Pack:       PackForNode(attachID),
+				NodeID:     attachID,
+				Attached:   false,
+				ReasonCode: "CAPABILITY_DENIED_NO_PRIMARY",
+				RuleRef:    "BR-02",
+				Message:    "capability cannot attach before primary selection",
+				NextAction: routeNextActionRefineEvidence,
+				DocsRef:    "",
+			})
+		}
+	}
+
+	return model.RouteResult{
+		Status:              status,
+		ErrorCode:           errCode,
+		Message:             message,
+		NextAction:          nextAction,
+		DecisionBasis:       decisionBasis,
+		DecisionTraceID:     buildTraceID(level, targetPack, targetDomain, activeDomain, status),
+		DocsRef:             "",
+		Candidates:          selected,
+		MustInclude:         must,
+		CapabilityDecisions: capabilityDecisions,
+	}, nil
 }
 
 func ReadNode(db *sql.DB, nodeID string, section string) (*model.NodeSummary, error) {
@@ -452,6 +760,8 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		Required:              []model.NodeSummary{},
 		ExecutionChildren:     []model.NodeSummary{},
 		Deferred:              []model.NodeSummary{},
+		IncludedDecisions:     []model.ContractDecision{},
+		ExcludedDecisions:     []model.ContractDecision{},
 		RequiredPacks:         []string{},
 		RecommendedValidators: []string{},
 		RecommendedArtifacts:  []string{},
@@ -465,13 +775,40 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		return bundle, nil
 	}
 	bundle.Main = main
+	bundle.IncludedDecisions = append(bundle.IncludedDecisions, model.ContractDecision{
+		NodeID:        mainNode,
+		Action:        "include",
+		ReasonCode:    "INCLUDE_PRIMARY_CONTEXT",
+		SourceRule:    "CONT-01",
+		Scope:         "target_domain",
+		DecisionBasis: "task_completable_and_explainable",
+		HumanNote:     "主上下文节点用于保证任务可完成性与规则可解释性。",
+	})
 	if profile, ok := profileForNode(mainNode); ok {
 		bundle.RequiredPacks = append(bundle.RequiredPacks, profile.RequiredPacks...)
 		bundle.RecommendedValidators = append(bundle.RecommendedValidators, profile.RecommendedValidators...)
 		bundle.RecommendedArtifacts = append(bundle.RecommendedArtifacts, profile.RecommendedArtifacts...)
 	}
 
-	appendNode := func(targetID string, collection *[]model.NodeSummary) error {
+	mainRecord, err := fetchNodeRecord(db, mainNode)
+	if err != nil {
+		return bundle, err
+	}
+	legalAttachSet := map[string]bool{}
+	for _, packName := range bundle.RequiredPacks {
+		reg, regErr := registry.Default()
+		if regErr != nil {
+			continue
+		}
+		if entry, ok := registry.FindByName(reg, packName); ok {
+			if strings.TrimSpace(entry.CanonicalBlueprintNode) != "" {
+				legalAttachSet[entry.CanonicalBlueprintNode] = true
+			}
+		}
+	}
+
+	includedSet := map[string]bool{mainNode: true}
+	appendNode := func(targetID string, collection *[]model.NodeSummary, reasonCode, sourceRule, scope, decisionBasis, humanNote string) error {
 		node, err := ReadNode(db, targetID, "summary")
 		if err != nil {
 			return err
@@ -479,6 +816,16 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 		if node == nil {
 			return nil
 		}
+		includedSet[targetID] = true
+		bundle.IncludedDecisions = append(bundle.IncludedDecisions, model.ContractDecision{
+			NodeID:        targetID,
+			Action:        "include",
+			ReasonCode:    reasonCode,
+			SourceRule:    sourceRule,
+			Scope:         scope,
+			DecisionBasis: decisionBasis,
+			HumanNote:     humanNote,
+		})
 		if node.Level == "L3" {
 			bundle.Deferred = append(bundle.Deferred, *node)
 			return nil
@@ -493,7 +840,24 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 			return bundle, err
 		}
 		for _, t := range targets {
-			if err := appendNode(t, &bundle.Required); err != nil {
+			legalAttachSet[t] = true
+			reasonCode := "INCLUDE_REQUIRED_WITH"
+			sourceRule := "BR-05B"
+			scope := "target_domain"
+			decisionBasis := "task_completable_and_explainable"
+			humanNote := "required_with 节点用于保证主任务闭环与约束完整。"
+			record, recErr := fetchNodeRecord(db, t)
+			if recErr != nil {
+				return bundle, recErr
+			}
+			if record.ActivationMode == "attach-only" && record.Domain != mainRecord.Domain {
+				reasonCode = "INCLUDE_ATTACH_REQUIRED"
+				sourceRule = "BR-03"
+				scope = "attach_only_capability"
+				decisionBasis = "attach_only_required_for_completeness"
+				humanNote = "attach-only capability 被 required_with 引用，作为必要依赖纳入交付。"
+			}
+			if err := appendNode(t, &bundle.Required, reasonCode, sourceRule, scope, decisionBasis, humanNote); err != nil {
 				return bundle, err
 			}
 		}
@@ -505,7 +869,7 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 			return bundle, err
 		}
 		for _, t := range targets {
-			if err := appendNode(t, &bundle.ExecutionChildren); err != nil {
+			if err := appendNode(t, &bundle.ExecutionChildren, "INCLUDE_COMPLETENESS_RELAXATION", "CONT-02", "target_domain", "completeness_over_minimality", "为覆盖执行子步骤，放宽最小化并保留完整性。 "); err != nil {
 				return bundle, err
 			}
 		}
@@ -517,10 +881,58 @@ func BuildContextBundle(db *sql.DB, mainNode string, includeRequired, includeMay
 			return bundle, err
 		}
 		for _, t := range targets {
-			if err := appendNode(t, &bundle.ExecutionChildren); err != nil {
+			if err := appendNode(t, &bundle.ExecutionChildren, "INCLUDE_COMPLETENESS_RELAXATION", "CONT-02", "target_domain", "completeness_over_minimality", "为避免遗漏常见失败场景，放宽最小化并纳入候选补充上下文。 "); err != nil {
 				return bundle, err
 			}
 		}
+	}
+
+	nodesForContract, err := fetchNodes(db, nil)
+	if err != nil {
+		return bundle, err
+	}
+	for _, candidate := range nodesForContract {
+		if candidate.ID == mainNode {
+			continue
+		}
+		inTargetDomain := candidate.Domain == mainRecord.Domain && candidate.ActivationMode != "attach-only"
+		isLegalAttach := legalAttachSet[candidate.ID] && candidate.ActivationMode == "attach-only"
+		if !inTargetDomain && !isLegalAttach {
+			bundle.ExcludedDecisions = append(bundle.ExcludedDecisions, model.ContractDecision{
+				NodeID:        candidate.ID,
+				Action:        "exclude",
+				ReasonCode:    "EXCLUDE_OUT_OF_SCOPE_DOMAIN",
+				SourceRule:    "CONT-01",
+				Scope:         "domain_boundary",
+				DecisionBasis: "target_domain_plus_legal_attach_only",
+				HumanNote:     "节点位于目标主域之外或不在合法 attach-only 候选集中，按域边界规则排除。",
+			})
+			continue
+		}
+		if includedSet[candidate.ID] {
+			continue
+		}
+		reasonCode := "EXCLUDE_MINIMALITY_BOUNDARY"
+		sourceRule := "BR-05A"
+		scope := "target_domain"
+		decisionBasis := "minimality_guard"
+		humanNote := "候选节点不影响当前闭环，按最小上下文契约排除。"
+		if isLegalAttach {
+			reasonCode = "EXCLUDE_ATTACH_NOT_REQUIRED"
+			sourceRule = "BR-03"
+			scope = "attach_only_capability"
+			decisionBasis = "attach_only_not_required"
+			humanNote = "attach-only capability 在当前任务未形成硬性依赖，故不默认交付。"
+		}
+		bundle.ExcludedDecisions = append(bundle.ExcludedDecisions, model.ContractDecision{
+			NodeID:        candidate.ID,
+			Action:        "exclude",
+			ReasonCode:    reasonCode,
+			SourceRule:    sourceRule,
+			Scope:         scope,
+			DecisionBasis: decisionBasis,
+			HumanNote:     humanNote,
+		})
 	}
 
 	return bundle, nil

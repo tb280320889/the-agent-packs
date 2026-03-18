@@ -1,18 +1,21 @@
 package compiler
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	yaml "gopkg.in/yaml.v3"
 	_ "modernc.org/sqlite"
 
 	"the-agent-packs/internal/model"
@@ -39,6 +42,27 @@ var requiredKeys = []string{
 	"activation_mode",
 }
 
+type frontmatter struct {
+	ID              string   `yaml:"id"`
+	Level           string   `yaml:"level"`
+	Domain          string   `yaml:"domain"`
+	Subdomain       *string  `yaml:"subdomain"`
+	Capability      *string  `yaml:"capability"`
+	Title           string   `yaml:"title"`
+	Summary         string   `yaml:"summary"`
+	Aliases         []string `yaml:"aliases"`
+	Triggers        []string `yaml:"triggers"`
+	AntiTriggers    []string `yaml:"anti_triggers"`
+	RequiredWith    []string `yaml:"required_with"`
+	MayInclude      []string `yaml:"may_include"`
+	Children        []string `yaml:"children"`
+	EntryConditions []string `yaml:"entry_conditions"`
+	StopConditions  []string `yaml:"stop_conditions"`
+	NodeKind        string   `yaml:"node_kind"`
+	VisibilityScope string   `yaml:"visibility_scope"`
+	ActivationMode  string   `yaml:"activation_mode"`
+}
+
 func parseFrontmatter(text string) (map[string]any, string, error) {
 	lines := strings.Split(text, "\n")
 	if len(lines) == 0 || strings.TrimSpace(strings.TrimRight(lines[0], "\r")) != "---" {
@@ -56,39 +80,109 @@ func parseFrontmatter(text string) (map[string]any, string, error) {
 		return nil, "", errors.New("frontmatter not closed with ---")
 	}
 
-	fm := map[string]any{}
-	currentKey := ""
-	for _, raw := range lines[1:end] {
-		line := strings.TrimRight(raw, "\r")
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
+	var payload frontmatter
+	decoder := yaml.NewDecoder(bytes.NewReader([]byte(strings.Join(lines[1:end], "\n"))))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, "", err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return nil, "", errors.New("frontmatter must contain a single document")
 		}
-		if strings.HasPrefix(strings.TrimLeft(line, " \t"), "-") && currentKey != "" {
-			arr, ok := fm[currentKey].([]string)
-			if !ok {
-				return nil, "", fmt.Errorf("invalid list field: %s", currentKey)
-			}
-			item := strings.TrimSpace(strings.TrimPrefix(strings.TrimLeft(line, " \t"), "-"))
-			fm[currentKey] = append(arr, item)
-			continue
-		}
+		return nil, "", err
+	}
 
-		k, v, found := strings.Cut(line, ":")
-		if !found {
-			return nil, "", fmt.Errorf("invalid frontmatter line: %s", line)
+	subdomainValue := ""
+	if payload.Subdomain != nil {
+		subdomainValue = *payload.Subdomain
+	}
+	capabilityValue := ""
+	if payload.Capability != nil {
+		capabilityValue = *payload.Capability
+	}
+	fm := map[string]any{
+		"id":               payload.ID,
+		"level":            payload.Level,
+		"domain":           payload.Domain,
+		"subdomain":        subdomainValue,
+		"capability":       capabilityValue,
+		"title":            payload.Title,
+		"summary":          payload.Summary,
+		"aliases":          payload.Aliases,
+		"triggers":         payload.Triggers,
+		"anti_triggers":    payload.AntiTriggers,
+		"required_with":    payload.RequiredWith,
+		"may_include":      payload.MayInclude,
+		"children":         payload.Children,
+		"entry_conditions": payload.EntryConditions,
+		"stop_conditions":  payload.StopConditions,
+		"node_kind":        payload.NodeKind,
+		"visibility_scope": payload.VisibilityScope,
+		"activation_mode":  payload.ActivationMode,
+	}
+
+	body := strings.TrimSpace(strings.Join(lines[end+1:], "\n"))
+	return fm, body, nil
+}
+
+func parseFrontmatterWithErrors(text string) (map[string]any, string, []model.CompilerError) {
+	lines := strings.Split(text, "\n")
+	if len(lines) == 0 || strings.TrimSpace(strings.TrimRight(lines[0], "\r")) != "---" {
+		return nil, "", []model.CompilerError{{Phase: string(PhaseParse), Code: "frontmatter_missing", Message: "frontmatter missing or not starting with ---", Line: 1}}
+	}
+
+	end := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(strings.TrimRight(lines[i], "\r")) == "---" {
+			end = i
+			break
 		}
-		key := strings.TrimSpace(k)
-		val := strings.TrimSpace(v)
-		currentKey = key
-		switch val {
-		case "", "[]":
-			fm[key] = []string{}
-		case "null":
-			fm[key] = nil
-		default:
-			fm[key] = val
+	}
+	if end == -1 {
+		return nil, "", []model.CompilerError{{Phase: string(PhaseParse), Code: "frontmatter_unclosed", Message: "frontmatter not closed with ---", Line: len(lines)}}
+	}
+
+	var payload frontmatter
+	decoder := yaml.NewDecoder(bytes.NewReader([]byte(strings.Join(lines[1:end], "\n"))))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, "", []model.CompilerError{{Phase: string(PhaseParse), Code: "frontmatter_decode", Message: err.Error(), Line: 2}}
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return nil, "", []model.CompilerError{{Phase: string(PhaseParse), Code: "frontmatter_multiple_docs", Message: "frontmatter must contain a single document", Line: 2}}
 		}
+		return nil, "", []model.CompilerError{{Phase: string(PhaseParse), Code: "frontmatter_decode", Message: err.Error(), Line: 2}}
+	}
+
+	subdomainValue := ""
+	if payload.Subdomain != nil {
+		subdomainValue = *payload.Subdomain
+	}
+	capabilityValue := ""
+	if payload.Capability != nil {
+		capabilityValue = *payload.Capability
+	}
+	fm := map[string]any{
+		"id":               payload.ID,
+		"level":            payload.Level,
+		"domain":           payload.Domain,
+		"subdomain":        subdomainValue,
+		"capability":       capabilityValue,
+		"title":            payload.Title,
+		"summary":          payload.Summary,
+		"aliases":          payload.Aliases,
+		"triggers":         payload.Triggers,
+		"anti_triggers":    payload.AntiTriggers,
+		"required_with":    payload.RequiredWith,
+		"may_include":      payload.MayInclude,
+		"children":         payload.Children,
+		"entry_conditions": payload.EntryConditions,
+		"stop_conditions":  payload.StopConditions,
+		"node_kind":        payload.NodeKind,
+		"visibility_scope": payload.VisibilityScope,
+		"activation_mode":  payload.ActivationMode,
 	}
 
 	body := strings.TrimSpace(strings.Join(lines[end+1:], "\n"))
@@ -236,7 +330,7 @@ func asStringSlice(v any) []string {
 	return []string{}
 }
 
-func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model.Edge, []map[string]string, error) {
+func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model.Edge, []model.CompilerError, error) {
 	files, err := loadBlueprintFiles(rootDir)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -245,7 +339,7 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 	nodes := make([]model.Node, 0)
 	metas := make([]model.NodeMeta, 0)
 	edges := make([]model.Edge, 0)
-	errs := make([]map[string]string, 0)
+	errs := make([]model.CompilerError, 0)
 
 	for _, p := range files {
 		base := filepath.Base(p)
@@ -255,12 +349,12 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 
 		rel, err := filepath.Rel(rootDir, p)
 		if err != nil {
-			errs = append(errs, map[string]string{"path": p, "error": err.Error()})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "path_rel", Message: err.Error()})
 			continue
 		}
 		parts := strings.Split(rel, string(filepath.Separator))
 		if len(parts) < 3 {
-			errs = append(errs, map[string]string{"path": p, "error": "invalid path structure"})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "path_structure", Message: "invalid path structure"})
 			continue
 		}
 
@@ -280,13 +374,16 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 
 		raw, err := os.ReadFile(p)
 		if err != nil {
-			errs = append(errs, map[string]string{"path": p, "error": err.Error()})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "read_file", Message: err.Error()})
 			continue
 		}
 		content := string(raw)
-		fm, body, err := parseFrontmatter(content)
-		if err != nil {
-			errs = append(errs, map[string]string{"path": p, "error": err.Error()})
+		fm, body, parseErrs := parseFrontmatterWithErrors(content)
+		if len(parseErrs) > 0 {
+			for _, parseErr := range parseErrs {
+				parseErr.Path = p
+				errs = append(errs, parseErr)
+			}
 			continue
 		}
 
@@ -297,33 +394,30 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 			}
 		}
 		if len(missing) > 0 {
-			errs = append(errs, map[string]string{
-				"path":  p,
-				"error": fmt.Sprintf("missing keys: %v", missing),
-			})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "missing_keys", Message: fmt.Sprintf("missing keys: %v", missing)})
 			continue
 		}
 		if asString(fm["node_kind"]) == "" || asString(fm["visibility_scope"]) == "" || asString(fm["activation_mode"]) == "" {
-			errs = append(errs, map[string]string{"path": p, "error": "routing classification keys must be non-empty"})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "routing_keys_empty", Message: "routing classification keys must be non-empty"})
 			continue
 		}
 
 		derivedID := deriveID(levelDir, domainDir, subdomainDir, stem)
 		if asString(fm["id"]) != derivedID {
-			errs = append(errs, map[string]string{"path": p, "error": fmt.Sprintf("id mismatch: %s != %s", asString(fm["id"]), derivedID)})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "id_mismatch", Message: fmt.Sprintf("id mismatch: %s != %s", asString(fm["id"]), derivedID)})
 			continue
 		}
 		if asString(fm["level"]) != levelDir {
-			errs = append(errs, map[string]string{"path": p, "error": "level mismatch"})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "level_mismatch", Message: "level mismatch"})
 			continue
 		}
 		if asString(fm["domain"]) != domainDir {
-			errs = append(errs, map[string]string{"path": p, "error": "domain mismatch"})
+			errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "domain_mismatch", Message: "domain mismatch"})
 			continue
 		}
 		if levelDir != "L0" {
 			if subdomainDir == nil || asString(fm["subdomain"]) != *subdomainDir {
-				errs = append(errs, map[string]string{"path": p, "error": "subdomain mismatch"})
+				errs = append(errs, model.CompilerError{Phase: string(PhaseParse), Path: p, Code: "subdomain_mismatch", Message: "subdomain mismatch"})
 				continue
 			}
 		}
@@ -377,7 +471,7 @@ func validateAndCollect(rootDir string) ([]model.Node, []model.NodeMeta, []model
 	return nodes, metas, edges, errs, nil
 }
 
-func writeIndex(dbPath string, nodes []model.Node, metas []model.NodeMeta, edges []model.Edge) error {
+func writeIndexToFile(dbPath string, nodes []model.Node, metas []model.NodeMeta, edges []model.Edge) error {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		return err
 	}
@@ -458,7 +552,7 @@ func writeIndex(dbPath string, nodes []model.Node, metas []model.NodeMeta, edges
 	return nil
 }
 
-func writeReports(reportDir string, errs []map[string]string, edges []model.Edge, nodes []model.Node) error {
+func writeReports(reportDir string, errs []model.CompilerError, edges []model.Edge, nodes []model.Node) error {
 	if err := os.MkdirAll(reportDir, 0o755); err != nil {
 		return err
 	}
@@ -486,16 +580,48 @@ func writeReports(reportDir string, errs []map[string]string, edges []model.Edge
 	return nil
 }
 
-func Compile(rootDir, dbPath, reportDir string) ([]map[string]string, error) {
+func Compile(rootDir, dbPath, reportDir string) (CompileResult, error) {
 	nodes, metas, edges, errs, err := validateAndCollect(rootDir)
 	if err != nil {
-		return nil, err
+		compileErr := model.CompilerError{Phase: string(PhaseParse), Path: rootDir, Code: "load_blueprint", Message: err.Error()}
+		return CompileResult{Errors: append(errs, compileErr)}, err
 	}
-	if err := writeIndex(dbPath, nodes, metas, edges); err != nil {
-		return nil, err
+	tmpPath := dbPath + ".tmp"
+	backupPath := dbPath + ".bak"
+
+	_ = os.Remove(tmpPath)
+	if err := writeIndexToFile(tmpPath, nodes, metas, edges); err != nil {
+		compileErr := model.CompilerError{Phase: string(PhaseIndex), Path: tmpPath, Code: "index_write", Message: err.Error()}
+		_ = os.Remove(tmpPath)
+		return CompileResult{Errors: append(errs, compileErr)}, err
 	}
 	if err := writeReports(reportDir, errs, edges, nodes); err != nil {
-		return nil, err
+		compileErr := model.CompilerError{Phase: string(PhaseReport), Path: reportDir, Code: "report_write", Message: err.Error()}
+		_ = os.Remove(tmpPath)
+		return CompileResult{Errors: append(errs, compileErr)}, err
 	}
-	return errs, nil
+
+	backupCreated := false
+	if _, err := os.Stat(dbPath); err == nil {
+		_ = os.Remove(backupPath)
+		if err := os.Rename(dbPath, backupPath); err != nil {
+			compileErr := model.CompilerError{Phase: string(PhaseIndex), Path: dbPath, Code: "index_backup", Message: err.Error()}
+			_ = os.Remove(tmpPath)
+			return CompileResult{Errors: append(errs, compileErr)}, err
+		}
+		backupCreated = true
+	}
+	if err := os.Rename(tmpPath, dbPath); err != nil {
+		if backupCreated {
+			_ = os.Rename(backupPath, dbPath)
+		}
+		compileErr := model.CompilerError{Phase: string(PhaseIndex), Path: dbPath, Code: "index_swap", Message: err.Error()}
+		_ = os.Remove(tmpPath)
+		return CompileResult{Errors: append(errs, compileErr)}, err
+	}
+	if backupCreated {
+		_ = os.Remove(backupPath)
+	}
+
+	return CompileResult{Errors: errs}, nil
 }

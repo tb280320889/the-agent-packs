@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
 type PackageEntry struct {
@@ -32,13 +35,31 @@ type Registry struct {
 }
 
 type packageManifest struct {
-	Name       string
-	Kind       string
-	Domain     string
-	Subdomain  string
-	DependsOn  []string
-	Validators []string
-	Artifacts  []string
+	Name         string           `yaml:"name"`
+	Kind         string           `yaml:"kind"`
+	Domain       string           `yaml:"domain"`
+	Subdomain    string           `yaml:"subdomain"`
+	Layer        string           `yaml:"layer"`
+	Version      string           `yaml:"version"`
+	Goal         string           `yaml:"goal"`
+	Inputs       []string         `yaml:"inputs"`
+	DependsOn    []string         `yaml:"depends_on"`
+	MCP          *manifestMCP     `yaml:"mcp"`
+	Validators   []string         `yaml:"validators"`
+	Handoff      *manifestHandoff `yaml:"handoff"`
+	Artifacts    []string         `yaml:"artifacts"`
+	ExitCriteria []string         `yaml:"exit_criteria"`
+}
+
+type manifestMCP struct {
+	Tools     []string `yaml:"tools"`
+	Resources []string `yaml:"resources"`
+	Prompts   []string `yaml:"prompts"`
+}
+
+type manifestHandoff struct {
+	Incoming []string `yaml:"incoming"`
+	Outgoing []string `yaml:"outgoing"`
 }
 
 var (
@@ -241,59 +262,11 @@ func readPackageManifest(path string) (packageManifest, error) {
 	if err != nil {
 		return packageManifest{}, err
 	}
-	manifest := packageManifest{}
-	currentListKey := ""
-	for _, line := range strings.Split(string(raw), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		indent := len(line) - len(strings.TrimLeft(line, " \t"))
-		if strings.HasPrefix(trimmed, "- ") {
-			if currentListKey == "" {
-				continue
-			}
-			value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
-			value = strings.Trim(value, `"'`)
-			switch currentListKey {
-			case "depends_on":
-				manifest.DependsOn = append(manifest.DependsOn, value)
-			case "validators":
-				manifest.Validators = append(manifest.Validators, value)
-			case "artifacts":
-				manifest.Artifacts = append(manifest.Artifacts, value)
-			}
-			continue
-		}
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		if indent == 0 && value == "" {
-			switch key {
-			case "depends_on", "validators", "artifacts":
-				currentListKey = key
-			default:
-				currentListKey = ""
-			}
-			continue
-		}
-		if indent == 0 {
-			currentListKey = ""
-		}
-		value = strings.Trim(value, `"'`)
-		switch key {
-		case "name":
-			manifest.Name = value
-		case "kind":
-			manifest.Kind = value
-		case "domain":
-			manifest.Domain = value
-		case "subdomain":
-			manifest.Subdomain = value
-		}
+	var manifest packageManifest
+	decoder := yaml.NewDecoder(bytes.NewReader(raw))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&manifest); err != nil {
+		return packageManifest{}, err
 	}
 	if manifest.Name == "" || manifest.Kind == "" || manifest.Domain == "" || manifest.Subdomain == "" {
 		return packageManifest{}, errors.New("package manifest must include name, kind, domain, subdomain")

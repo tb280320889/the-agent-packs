@@ -1,0 +1,101 @@
+name: the-agent-packs-aidp
+full_name: the-agent-packs Project AIDP
+language: zh-CN
+version: 1.1.0
+created_at: 2026-03-16
+base_system_aidp_version: 2.0.1
+instance_role: local-project-aidp
+primary_identity: agent-packs-producer-system
+project_type:
+  - brownfield
+  - milestone-extension
+goal: >
+  将 the-agent-packs 从当前以 WXT 为样板域的最薄闭环，推进为一个稳定的
+  agent-packs 增强包生产者系统：既支持多主域、多横线能力、多 workflow
+  package 持续接入，又保证消费侧 agents 能通过 MCP 等方式，以渐进披露模式
+  仅获得目标域相关、最精简且不遗漏的上下文知识；同时以 AIDP 统一内部开发
+  agent 对项目语义、边界、运行态维护与 GSD 映射的理解。
+producer_role_definition: >
+  本项目负责治理知识、定义主域与能力边界、组织 package、维护验证机制，并
+  生产可被下游 agents 受控消费的增强 pack。
+consumer_role_definition: >
+  消费侧 agents 通过 MCP 等方式按任务目标消费目标主域或 capability 对应的
+  上下文切片，而不是默认理解整个仓库或完整 AIDP。
+developer_role_definition: >
+  开发本项目的开发 agents 负责建设和维护增强包生产系统本身，需要理解项目
+  全局语义和边界，但不应把自己默认代入最终消费侧视角。
+context_delivery_principles:
+  - minimal-but-complete
+  - domain-scoped
+  - capability-attached-only-when-needed
+  - progressively-disclosed
+  - traceable-and-verifiable
+external_consumption_contract:
+  - 消费侧默认不暴露全仓语义
+  - 消费侧只应获得目标域和任务所需的上下文知识
+  - 上下文交付必须避免冗余、遗漏和跨域串线
+default_read_order:
+  - AGENTS.md
+  - AIDP-MANIFEST.yaml
+  - core/00-身份视角与项目定位.md
+  - protocol/01-输入输出定义.md
+  - protocol/02-信息收集协议.md
+  - protocol/03-追问决策树.md
+  - protocol/04-默认假设协议.md
+  - protocol/05-输出生成协议.md
+  - core/01-项目总览.md
+  - core/05-范围与边界.md
+  - core/06-业务规则与关键对象.md
+  - core/08-技术约束与工程约定.md
+  - core/10-验收标准.md
+  - core/12-默认假设与待确认问题.md
+  - runtime/01-默认假设账本.md
+  - runtime/02-决策日志.md
+  - adapters/gsd/00-协同原则.md
+  - adapters/gsd/01-全局产物映射.md
+minimal_input_schema:
+  required:
+    - current_repo_state
+    - current_goal
+    - execution_scope
+  optional:
+    - related_gsd_issue
+    - target_phase
+    - affected_modules
+    - verification_expectation
+quality_gates:
+  - confirmed_assumed_open_separated
+  - bounded_context_preserved
+  - activation_first_preserved
+  - no_unapproved_scope_expansion
+  - gsd_truth_source_preserved
+  - producer_consumer_developer_roles_separated
+  - progressive_disclosure_contract_preserved
+  - consumer_context_minimal_and_complete
+layers:
+  - id: core
+    description: 项目语义内核
+  - id: protocol
+    description: agent 行为协议
+  - id: runtime
+    description: 运行态工件
+  - id: adapters
+    description: 对 GSD 等执行框架的映射
+legacy_sources:
+  - docs/改造计划v1/
+  - .planning/codebase/
+primary_runtime_artifacts:
+  - runtime/01-默认假设账本.md
+  - runtime/02-决策日志.md
+  - runtime/03-变更摘要.md
+  - runtime/04-phase-context.md
+  - runtime/06-验证记录.md
+  - runtime/08-增强开发任务启动单.md
+  - runtime/09-迭代会话交接.md
+governance_files:
+  - VERSION.md
+  - CHANGELOG.md
+  - COMPATIBILITY.md
+  - GOVERNANCE.md
+  - CONTRIBUTING.md
+  - RELEASE-CHECKLIST.md

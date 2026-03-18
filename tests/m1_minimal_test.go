@@ -27,12 +27,12 @@ func compileMainIndex(t *testing.T) string {
 	root := projectRoot(t)
 	dbPath := filepath.Join(root, "blueprint", "index", "blueprint.db")
 	reportDir := filepath.Join(root, "blueprint", "index")
-	errList, err := compiler.Compile(filepath.Join(root, "blueprint"), dbPath, reportDir)
+	compileResult, err := compiler.Compile(filepath.Join(root, "blueprint"), dbPath, reportDir)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) > 0 {
-		t.Fatalf("compile has errors: %+v", errList)
+	if len(compileResult.Errors) > 0 {
+		t.Fatalf("compile has errors: %+v", compileResult.Errors)
 	}
 	return dbPath
 }
@@ -91,8 +91,20 @@ func TestRouteTargetPackHasHighestPriority(t *testing.T) {
 	if len(result.Candidates) == 0 {
 		t.Fatalf("expected candidates")
 	}
+	if result.Status != "completed" {
+		t.Fatalf("expected completed status, got %s", result.Status)
+	}
 	if result.Candidates[0].ID != "L1.security.permissions" {
 		t.Fatalf("unexpected candidate: %s", result.Candidates[0].ID)
+	}
+	if result.Candidates[0].ReasonCode != "TARGET_PACK_EXACT" {
+		t.Fatalf("expected reason code TARGET_PACK_EXACT, got %s", result.Candidates[0].ReasonCode)
+	}
+	if result.Candidates[0].RuleRef != "BR-04" {
+		t.Fatalf("expected rule ref BR-04, got %s", result.Candidates[0].RuleRef)
+	}
+	if result.Candidates[0].DocsRef != "" {
+		t.Fatalf("expected empty docs_ref placeholder, got %q", result.Candidates[0].DocsRef)
 	}
 	if result.Candidates[0].ActivationMode != "attach-only" {
 		t.Fatalf("expected attach-only candidate metadata, got %+v", result.Candidates[0])
@@ -106,6 +118,12 @@ func TestRouteTargetPackHasHighestPriority(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("target_pack match reason missing")
+	}
+	if result.DecisionBasis != "target_pack>canonical_exact" {
+		t.Fatalf("unexpected decision basis: %s", result.DecisionBasis)
+	}
+	if result.DecisionTraceID == "" {
+		t.Fatalf("decision trace id should not be empty")
 	}
 }
 
@@ -206,6 +224,29 @@ func TestRouteDomainCompetitionExcludesAttachOnlyCapability(t *testing.T) {
 	if len(result.MustInclude) != 2 {
 		t.Fatalf("expected deduplicated must_include entries, got %+v", result.MustInclude)
 	}
+	if result.MustInclude[0] != "L1.release.store-review" || result.MustInclude[1] != "L1.security.permissions" {
+		t.Fatalf("expected stable sorted must_include entries, got %+v", result.MustInclude)
+	}
+	if result.DecisionBasis != "score>canonical>domain>rule>lexicographic" {
+		t.Fatalf("unexpected decision basis for L1: %s", result.DecisionBasis)
+	}
+	if len(result.CapabilityDecisions) == 0 {
+		t.Fatalf("expected capability decisions for attach-only packages")
+	}
+	for _, decision := range result.CapabilityDecisions {
+		if !decision.Attached {
+			t.Fatalf("expected attached capability decision, got %+v", decision)
+		}
+		if decision.ReasonCode != "CAPABILITY_ATTACHED" {
+			t.Fatalf("unexpected capability reason code: %s", decision.ReasonCode)
+		}
+		if decision.RuleRef != "BR-03" {
+			t.Fatalf("unexpected capability rule ref: %s", decision.RuleRef)
+		}
+		if decision.DocsRef != "" {
+			t.Fatalf("expected empty docs_ref placeholder, got %q", decision.DocsRef)
+		}
+	}
 }
 
 func TestRouteAntiTriggerExclusion(t *testing.T) {
@@ -230,19 +271,19 @@ func TestFrontmatterSummaryWithColon(t *testing.T) {
 		t.Fatalf("mkdir failed: %v", err)
 	}
 	filePath := filepath.Join(l0Dir, "overview.md")
-	content := "---\nid: L0.demo\nlevel: L0\ndomain: demo\nsubdomain: null\ncapability: null\nnode_kind: domain-root\nvisibility_scope: global\nactivation_mode: direct\ntitle: Demo\nsummary: This summary has colon: valid content\naliases: []\ntriggers:\n  - demo\nanti_triggers: []\nrequired_with: []\nmay_include: []\nchildren: []\nentry_conditions: []\nstop_conditions: []\n---\n\ndemo body\n"
+	content := "---\nid: L0.demo\nlevel: L0\ndomain: demo\nsubdomain: null\ncapability: null\nnode_kind: domain-root\nvisibility_scope: global\nactivation_mode: direct\ntitle: Demo\nsummary: \"This summary has colon: valid content\"\naliases: []\ntriggers:\n  - demo\nanti_triggers: []\nrequired_with: []\nmay_include: []\nchildren: []\nentry_conditions: []\nstop_conditions: []\n---\n\ndemo body\n"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatalf("write file failed: %v", err)
 	}
 
 	dbPath := filepath.Join(tempDir, "index", "blueprint.db")
 	reportDir := filepath.Join(tempDir, "index")
-	errList, err := compiler.Compile(tempDir, dbPath, reportDir)
+	compileResult, err := compiler.Compile(tempDir, dbPath, reportDir)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) != 0 {
-		t.Fatalf("expected no errors, got %+v", errList)
+	if len(compileResult.Errors) != 0 {
+		t.Fatalf("expected no errors, got %+v", compileResult.Errors)
 	}
 }
 
@@ -260,11 +301,11 @@ func TestFrontmatterMissingRequiredKeysDetected(t *testing.T) {
 
 	dbPath := filepath.Join(tempDir, "index", "blueprint.db")
 	reportDir := filepath.Join(tempDir, "index")
-	errList, err := compiler.Compile(tempDir, dbPath, reportDir)
+	compileResult, err := compiler.Compile(tempDir, dbPath, reportDir)
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	if len(errList) == 0 {
+	if len(compileResult.Errors) == 0 {
 		t.Fatalf("expected missing keys errors")
 	}
 }
@@ -349,6 +390,18 @@ func TestActivationPartialWhenDomainKnownButNoCandidate(t *testing.T) {
 	}
 	if result.Status != "partial" {
 		t.Fatalf("expected partial, got %s", result.Status)
+	}
+	if result.RouteStatus != "completed" {
+		t.Fatalf("expected route status completed, got %s", result.RouteStatus)
+	}
+	if result.RouteErrorCode != "" {
+		t.Fatalf("expected empty route error code, got %s", result.RouteErrorCode)
+	}
+	if result.RouteNextAction != "" {
+		t.Fatalf("expected empty route next action, got %s", result.RouteNextAction)
+	}
+	if result.RouteDocsRef != "" {
+		t.Fatalf("expected empty route docs_ref placeholder, got %q", result.RouteDocsRef)
 	}
 }
 
