@@ -344,6 +344,14 @@ func capabilityAttachAllowed(candidate nodeRecord, activeDomain string) bool {
 	return candidate.VisibilityScope == "capability-scoped" || candidate.VisibilityScope == "domain-scoped"
 }
 
+func isMonorepoDomainEnabled() bool {
+	raw := strings.TrimSpace(strings.ToLower(os.Getenv("DOMAIN_MONOREPO_ENABLED")))
+	if raw == "" {
+		return true
+	}
+	return raw != "false" && raw != "0" && raw != "off"
+}
+
 func inferMainDomain(task string, selectedFiles, configFragments, contextHints []string) string {
 	taskText := tokenize(task)
 	joined := strings.Join(append(append([]string{}, selectedFiles...), append(configFragments, contextHints...)...), " ")
@@ -594,6 +602,9 @@ func RouteQuery(db *sql.DB, level string, task string, targetPack *string, targe
 	attachIDs := make([]string, 0)
 
 	for _, row := range nodes {
+		if row.Domain == "monorepo" && !isMonorepoDomainEnabled() {
+			continue
+		}
 		if level == "L0" {
 			if domainNodeAllowedInGlobal(row) {
 				globalPool = append(globalPool, row)
