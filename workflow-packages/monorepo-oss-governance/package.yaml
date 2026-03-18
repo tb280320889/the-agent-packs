@@ -1,0 +1,38 @@
+name: monorepo-oss-governance
+kind: workflow-package
+domain: monorepo
+subdomain: oss-governance
+layer: product-line
+version: 0.1.0
+goal: >
+  Review monorepo OSS governance rules, contribution standards,
+  repository policy consistency, and organization-level guardrails.
+inputs:
+  - user_goal
+  - project_state
+  - host_environment
+  - available_tools
+  - governance_constraints
+depends_on: []
+mcp:
+  tools:
+    - inspect_governance_policy
+    - compare_repo_rules
+  resources:
+    - oss_governance_guidelines
+    - contribution_policy_template
+  prompts:
+    - governance_review_prompt
+    - policy_repair_prompt
+validators:
+  - validator-core-output
+handoff:
+  incoming:
+    - global-handoff
+  outgoing: []
+artifacts:
+  - monorepo-oss-governance-review.md
+exit_criteria:
+  - governance_rules_reviewed
+  - contribution_gates_defined
+  - validation_passed

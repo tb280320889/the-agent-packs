@@ -9,6 +9,28 @@
   ],
   "packages": [
     {
+      "name": "monorepo-oss-governance",
+      "kind": "workflow-package",
+      "domain": "monorepo",
+      "subdomain": "oss-governance",
+      "category": "workflow",
+      "canonical_blueprint_node": "L1.monorepo.oss-governance",
+      "visibility_scope": "domain-scoped",
+      "activation_mode": "direct",
+      "aliases": [
+        "oss governance",
+        "contribution governance"
+      ],
+      "reserved": false,
+      "recommended_validators": [
+        "validator-core-output"
+      ],
+      "recommended_artifacts": [
+        "monorepo-oss-governance-review.md"
+      ],
+      "required_packs": []
+    },
+    {
       "name": "wxt-manifest",
       "kind": "workflow-package",
       "domain": "wxt",

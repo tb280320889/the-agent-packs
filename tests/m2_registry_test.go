@@ -14,8 +14,8 @@ func TestM2RegistryLoadsAndValidates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load registry failed: %v", err)
 	}
-	if len(reg.Packages) != 3 {
-		t.Fatalf("expected 3 registered packages, got %d", len(reg.Packages))
+	if len(reg.Packages) != 4 {
+		t.Fatalf("expected 4 registered packages, got %d", len(reg.Packages))
 	}
 	entry, ok := registry.FindByName(reg, "wxt-manifest")
 	if !ok {
