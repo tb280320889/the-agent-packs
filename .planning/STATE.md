@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: 3
 status: unknown
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-18T06:01:48.208Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-03-18T06:12:46.518Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # GSD State: the-agent-packs
@@ -38,7 +38,7 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 
 ## Progress
 
-- **Progress:** [█████████░] 87%
+- **Progress:** [█████████░] 93%
 - **Current Plan:** 3
 - **Total Plans in Phase:** 3
 - Current Phase: 04
@@ -69,6 +69,9 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 - [Phase 04]: Validation plan由registry聚合main_pack与required_packs声明，强制core优先且稳定排序。
 - [Phase 04]: ValidationMachineView固定三态(passed/warned/failed)，ActivationResult保留流程态(completed/partial/failed)并建立映射。
 - [Phase 04]: validation_manual_rerun触发manual_rerun，warned路径必须输出run_id留痕动作。
+- [Phase 04]: runtime ledger 写入采用 immediate/batch_finalize 双模式，关键事件即时回写。
+- [Phase 04]: 同一 TraceID+RecordType 采用版本追加，旧版本 IsCurrent=false，新版本 IsCurrent=true。
+- [Phase 04]: batch_finalize 延后补记默认 24h deadline，超窗升级 RiskEscalated 并输出 runtime-ledger-overdue。
 
 ## Performance Metrics
 
@@ -84,11 +87,12 @@ See: `.planning/PROJECT.md` (updated 2026-03-16)
 | Phase 03 P02 | 7 min | 3 tasks | 7 files |
 | Phase 04 P01 | 3 min | 3 tasks | 4 files |
 | Phase 04 P02 | 5 min | 3 tasks | 4 files |
+| Phase 04 P03 | 3 min | 3 tasks | 8 files |
 
 ## Session
 
-- **Last session:** 2026-03-18T06:01:48.201Z
-- **Stopped At:** Completed 04-02-PLAN.md
+- **Last session:** 2026-03-18T06:12:46.512Z
+- **Stopped At:** Completed 04-03-PLAN.md
 - **Resume file:** None
 
 ## Roadmap Snapshot
