@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,105 @@ import (
 	"the-agent-packs/internal/activation"
 	"the-agent-packs/internal/model"
 )
+
+func collectRecordTypes(entries []model.RuntimeLedgerEntry) []string {
+	typeSet := map[string]bool{}
+	for _, entry := range entries {
+		typeSet[entry.RecordType] = true
+	}
+	types := make([]string, 0, len(typeSet))
+	for recordType := range typeSet {
+		types = append(types, recordType)
+	}
+	sort.Strings(types)
+	return types
+}
+
+func TestM4RuntimeLedgerRecordTypesFromKeyChanges(t *testing.T) {
+	baseTS := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
+
+	testCases := []struct {
+		name       string
+		input      activation.RuntimeLedgerBuildInput
+		expectsAny []string
+	}{
+		{
+			name: "milestone emits validation",
+			input: activation.RuntimeLedgerBuildInput{
+				TraceID:       "runtime-ledger:req-types:milestone",
+				RunID:         "req-types:validation:1",
+				TriggerKind:   model.ValidationTriggerMilestoneAuto,
+				MachineStatus: model.ValidationStatusPassed,
+				Timestamp:     baseTS,
+				SourceRefs:    []string{"docs/AIDP/runtime/06-验证记录.md"},
+				Finalized:     true,
+			},
+			expectsAny: []string{"validation"},
+		},
+		{
+			name: "rule_change_auto emits change",
+			input: activation.RuntimeLedgerBuildInput{
+				TraceID:       "runtime-ledger:req-types:change",
+				RunID:         "req-types:validation:2",
+				TriggerKind:   model.ValidationTriggerRuleChangeAuto,
+				MachineStatus: model.ValidationStatusPassed,
+				Timestamp:     baseTS,
+				SourceRefs:    []string{"docs/AIDP/runtime/03-变更摘要.md"},
+				Finalized:     true,
+			},
+			expectsAny: []string{"change", "validation"},
+		},
+		{
+			name: "manual_rerun failed emits decision",
+			input: activation.RuntimeLedgerBuildInput{
+				TraceID:       "runtime-ledger:req-types:decision",
+				RunID:         "req-types:validation:3",
+				TriggerKind:   model.ValidationTriggerManualRerun,
+				MachineStatus: model.ValidationStatusFailed,
+				Timestamp:     baseTS,
+				SourceRefs:    []string{"docs/AIDP/runtime/02-决策日志.md"},
+				Finalized:     true,
+			},
+			expectsAny: []string{"decision", "validation"},
+		},
+		{
+			name: "batch_finalize deferred emits assumption",
+			input: activation.RuntimeLedgerBuildInput{
+				TraceID:        "runtime-ledger:req-types:assumption",
+				RunID:          "req-types:validation:4",
+				TriggerKind:    model.ValidationTriggerMilestoneAuto,
+				MachineStatus:  model.ValidationStatusPassed,
+				Timestamp:      baseTS,
+				SourceRefs:     []string{"docs/AIDP/runtime/01-默认假设账本.md"},
+				Finalized:      false,
+				DeferredReason: "awaiting finalize",
+			},
+			expectsAny: []string{"assumption", "validation"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, _, _ := activation.BuildRuntimeLedgerEntries(nil, tc.input)
+			recordTypes := collectRecordTypes(entries)
+
+			for _, expected := range tc.expectsAny {
+				if !slicesContains(recordTypes, expected) {
+					t.Fatalf("expected record type %q in %v", expected, recordTypes)
+				}
+			}
+		})
+	}
+}
+
+func slicesContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
 
 func TestM4RuntimeLedgerVersionAppendOnly(t *testing.T) {
 	traceID := "runtime-ledger:req-append:04:03"
