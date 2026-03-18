@@ -36,3 +36,10 @@
 - 删除决策：checkpoint 默认 `option-b`（暂不删除，等待人工明确批准）
 - 关键产物：`01.1-STRUCTURE-AUDIT.md`、`01.1-TARGET-TREE.md`、`01.1-MIGRATION-MAP.md`、`01.1-REFAC-COMMIT-PLAN.md`、`01.1-COMMIT-LOG.md`
 - 风险提示：若长期不做人工确认，`docs/archive/2026-03-phase-01.1/` 会积累待删项
+
+## 2026-03 Phase 04 Runtime Governance 更新
+- 名称：Validation & Runtime Governance（Plan 04-03）
+- 状态：in_progress（执行中）
+- 当前更新：runtime ledger 已引入 `immediate/batch_finalize` 混合触发策略，并实现 `TraceID+RecordType` append-only 版本追加。
+- 风险变化：batch_finalize 延后补记改为强约束（默认 24h deadline + 超窗 `RiskEscalated`），降低“会话补记失联”风险。
+- 证据链：validation run 继续使用 `run_id` 强关联 runtime ledger（`runtime-ledger:{run_id}`），并在 warned/overdue 路径输出显式后续动作。
