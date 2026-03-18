@@ -16,3 +16,7 @@ blueprint/index/
 # Go local build outputs
 bin/
 dist/
+
+# Env files
+.env
+.env.*
