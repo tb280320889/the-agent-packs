@@ -91,6 +91,14 @@ Plans:
 
 **Requirements:** VALD-01, VALD-02, GOVR-01
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — 建立 validation trace 契约（run_id + evidence + 双视图）
+- [ ] 04-02-PLAN.md — 由 registry 生成 validation plan 并固化混合触发/阻断分流
+- [ ] 04-03-PLAN.md — 落地 runtime ledger append-only 与延后补记升级机制
+- [ ] 04-04-PLAN.md — 关闭 gap：按 key change 写入 assumption/decision/change/validation 四类 record_type
+
 **Success Criteria:**
 1. validator 计划可从 registry 一致生成并执行（core + domain）。
 2. validation result 与 artifacts/handoff 具备可追踪关联。
